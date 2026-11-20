@@ -1,0 +1,16 @@
+# MySQL 8 ni Docker orqali ko'tarish (ixtiyoriy). Kompyuteringizda MySQL o'rnatilgan bo'lsa shart emas.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: askue-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: askue
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--max-allowed-packet=64M", "--innodb-buffer-pool-size=1G"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - askue_mysql:/var/lib/mysql
+volumes:
+  askue_mysql:

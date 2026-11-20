@@ -1,0 +1,52 @@
+import time
+from datetime import datetime, timedelta, timezone
+
+import bcrypt
+import jwt
+
+from .config import settings
+
+ALG = "HS256"
+
+
+def hash_password(p: str) -> str:
+    return bcrypt.hashpw(p.encode()[:72], bcrypt.gensalt(rounds=11)).decode()
+
+
+def verify_password(p: str, h: str) -> bool:
+    try:
+        return bcrypt.checkpw(p.encode()[:72], h.encode())
+    except ValueError:
+        return False
+
+
+def make_token(user_id: int) -> str:
+    exp = datetime.now(timezone.utc) + timedelta(hours=settings.token_hours)
+    return jwt.encode({"sub": str(user_id), "exp": exp}, settings.secret_key, algorithm=ALG)
+
+
+def read_token(token: str) -> int | None:
+    try:
+        data = jwt.decode(token, settings.secret_key, algorithms=[ALG])
+        return int(data["sub"])
+    except Exception:
+        return None
+
+
+# Oddiy login urinishlarini cheklash (xotirada)
+_fails: dict[str, list[float]] = {}
+
+
+def too_many_attempts(key: str, limit: int = 8, window: int = 300) -> bool:
+    now = time.time()
+    arr = [t for t in _fails.get(key, []) if now - t < window]
+    _fails[key] = arr
+    return len(arr) >= limit
+
+
+def register_fail(key: str) -> None:
+    _fails.setdefault(key, []).append(time.time())
+
+
+def clear_fails(key: str) -> None:
+    _fails.pop(key, None)
