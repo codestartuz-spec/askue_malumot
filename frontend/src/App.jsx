@@ -32,7 +32,7 @@ export default function App() {
       <Suspense fallback={<Spinner />}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/xabarlar" element={<Guard perm="telegram.send"><Messages /></Guard>} />
+          <Route path="/xabarlar" element={<Guard any={['telegram.message', 'telegram.journal']}><Messages /></Guard>} />
           <Route path="/dinamika" element={<Dynamics />} />
           <Route path="/konsentratorlar" element={<Navigate to="/dinamika?t=konsentrator" replace />} />
           <Route path="/aloqa" element={<Navigate to="/dinamika?t=aloqa" replace />} />
@@ -41,9 +41,9 @@ export default function App() {
           <Route path="/respublika" element={<Guard perm="republic.view"><Republic /></Guard>} />
           <Route path="/sozlamalar" element={<Guard any={['settings.manage', 'system.view', 'backup.manage']}><Settings /></Guard>} />
           <Route path="/brigadalar" element={<Guard perm="brigade.view"><Brigades /></Guard>} />
-          <Route path="/yuklash" element={<Guard perm="data.upload"><Upload /></Guard>} />
+          <Route path="/yuklash" element={<Guard any={['data.upload', 'republic.upload']}><Upload /></Guard>} />
           <Route path="/xodimlar" element={<Guard sadmin><Users /></Guard>} />
-          <Route path="/jurnal" element={<Guard sadmin><Audit /></Guard>} />
+          <Route path="/jurnal" element={<Guard perm="audit.view"><Audit /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

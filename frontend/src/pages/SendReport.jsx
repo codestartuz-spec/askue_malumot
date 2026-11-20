@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Send, FileText, FileSpreadsheet, Building2, Globe2, Megaphone, Users, CheckCircle2, AlertTriangle, MailCheck } from 'lucide-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { Modal, Spinner, useToast } from '../ui'
+import { Members, Modal, Spinner, useToast } from '../ui'
 import TgBotLink from '../TgBot'
 
 export default function SendReport({ espId, dates, onClose }) {
@@ -87,7 +87,7 @@ export default function SendReport({ espId, dates, onClose }) {
               {chats.map((c) => (
                 <label key={c.id} className={`chat ${sel.has(c.id) ? 'on' : ''}`}><input type="checkbox" checked={sel.has(c.id)} onChange={() => tg(sel, setSel, c.id)} disabled={busy} />
                   <i>{c.kind === 'kanal' ? <Megaphone size={18} /> : <Users size={18} />}</i>
-                  <span><b>{c.title}</b><small>{c.kind}{c.username ? ` • @${c.username}` : ''}</small></span></label>))}
+                  <span><b>{c.title} <Members c={c} /></b><small>{c.kind}{c.username ? ` • @${c.username}` : ''}</small></span></label>))}
             </div>)}
         </div>
       </div>

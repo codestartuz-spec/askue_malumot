@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, createContext, useContext, useCallback } from 'react'
-import { X, Loader2, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, X, Loader2, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import P from './logoPaths'
 
@@ -115,4 +115,11 @@ export function Confirm({ title, children, ok = 'Ha', cancel = 'Bekor qilish', d
       <div className="confirm-body">{children}</div>
     </Modal>
   )
+}
+
+// Kanal/guruh a'zolari soni nishoni
+export function Members({ c }) {
+  const n = c.members
+  return <span className="members" title={c.members_at ? `A'zolar soni (yangilangan: ${new Date(c.members_at).toLocaleString('ru-RU')})` : "A'zolar soni hali aniqlanmagan"}>
+    <Users size={13} />{n === null || n === undefined ? '—' : n.toLocaleString('ru-RU')}</span>
 }

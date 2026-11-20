@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe2, CalendarRange, Download, FileText, FileSpreadsheet, FileDown, Send, ArrowUp, ArrowDown, RefreshCw, UploadCloud, Megaphone, Users, AlertTriangle, CheckCircle2, MailCheck } from 'lucide-react'
+import { Globe2, GitCompareArrows, CalendarRange, Download, FileText, FileSpreadsheet, FileDown, Send, ArrowUp, ArrowDown, RefreshCw, UploadCloud, Megaphone, Users, AlertTriangle, CheckCircle2, MailCheck } from 'lucide-react'
 import { api, download, qs } from '../api'
 import { useAuth } from '../auth'
-import { Empty, Modal, Spinner, useToast } from '../ui'
+import { Members, Empty, Modal, Spinner, useToast } from '../ui'
 import { dmy, num } from '../fmt'
 import { Cell } from './DynPage'
 import TgBotLink from '../TgBot'
@@ -15,7 +15,7 @@ const Diff = ({ v, bad = true }) => {
 }
 const pdfD = (v) => (v === null || v === undefined || v === 0) ? '' : <span className={`pdfd ${v > 0 ? 'up' : 'dn'}`}>{v > 0 ? '↑' : '↓'} {num(Math.abs(v))}</span>
 
-function SendModal({ a, b, onClose }) {
+function SendModal({ a, b, mode, onClose }) {
   const { can } = useAuth()
   const toast = useToast()
   const [chats, setChats] = useState(null)
@@ -39,7 +39,7 @@ function SendModal({ a, b, onClose }) {
   }
   const go = async () => {
     setBusy(true)
-    try { const r = await api.post('/republic/send', { fmts: [...fmts], chat_ids: [...sel], a, b, ack }); setJob({ status: 'running', progress: 0, log: '' }); poll(r.id) }
+    try { const r = await api.post('/republic/send', { fmts: [...fmts], chat_ids: [...sel], a, b, mode, ack }); setJob({ status: 'running', progress: 0, log: '' }); poll(r.id) }
     catch (e) { toast(e.message, 'err'); setBusy(false) }
   }
   return (
@@ -51,7 +51,7 @@ function SendModal({ a, b, onClose }) {
         <div>
           <div className="mp-sec dark">1. Qaysi formatda</div>
           <div className="opts">
-            <label className={`opt ${fmts.has('pdf') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('pdf')} onChange={() => tg(setFmts, 'pdf')} disabled={busy} /><i><FileText size={20} /></i><span><b>PDF</b><small>{dmy(b)} holatiga{a ? `, ${dmy(a)} bilan solishtirib` : ''}</small></span></label>
+            <label className={`opt ${fmts.has('pdf') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('pdf')} onChange={() => tg(setFmts, 'pdf')} disabled={busy} /><i><FileText size={20} /></i><span><b>PDF</b><small>{dmy(b)} holatiga{a ? `, ${dmy(a)} bilan solishtirib` : ', oy boshidan dinamika'}</small></span></label>
             <label className={`opt ${fmts.has('orig') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('orig')} onChange={() => tg(setFmts, 'orig')} disabled={busy} /><i><FileDown size={20} /></i><span><b>Asl PDF</b><small>Respublika yuborgan fayl, o'zgartirishsiz</small></span></label>
             <label className={`opt ${fmts.has('xlsx') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('xlsx')} onChange={() => tg(setFmts, 'xlsx')} disabled={busy} /><i><FileSpreadsheet size={20} /></i><span><b>Excel</b><small>Jadval ko'rinishida</small></span></label>
           </div>
@@ -63,7 +63,7 @@ function SendModal({ a, b, onClose }) {
           ) : (
             <div className="chat-list">{chats.map((c) => (
               <label key={c.id} className={`chat ${sel.has(c.id) ? 'on' : ''}`}><input type="checkbox" checked={sel.has(c.id)} onChange={() => tg(setSel, c.id)} disabled={busy} />
-                <i>{c.kind === 'kanal' ? <Megaphone size={18} /> : <Users size={18} />}</i><span><b>{c.title}</b><small>{c.kind}{c.username ? ` • @${c.username}` : ''}</small></span></label>))}</div>)}
+                <i>{c.kind === 'kanal' ? <Megaphone size={18} /> : <Users size={18} />}</i><span><b>{c.title} <Members c={c} /></b><small>{c.kind}{c.username ? ` • @${c.username}` : ''}</small></span></label>))}</div>)}
         </div>
       </div>
       <label className={`ack-opt ${ack ? 'on' : ''}`}><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} disabled={busy} />
@@ -86,14 +86,16 @@ export default function Republic() {
   const [send, setSend] = useState(false)
   const [busy, setBusy] = useState('')
   const [pn, setPn] = useState(null)
+  const [mode, setMode] = useState('oy')
   const load = () => {
     setErr('')
-    api.get(`/republic/compare${qs({ a, b })}`).then((d) => { setData(d); if (!b) setB(d.b); if (!a && d.a) setA(d.a) }).catch((e) => { setErr(e.message); setData(null) })
+    api.get(`/republic/compare${qs({ a, b, mode })}`).then((d) => { setData(d); if (!b) setB(d.b); if (!a && d.a) setA(d.a) }).catch((e) => { setErr(e.message); setData(null) })
   }
-  useEffect(() => { load() }, [a, b])
+  useEffect(() => { load() }, [a, b, mode])
+  const pick = (m) => { if (m !== mode) { setA(''); setMode(m) } }
   const dl = async (fmt) => {
     setBusy(fmt)
-    try { await download(`/republic/download${qs({ fmt, a, b })}`, `Respublika_dinamikasi.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`) } catch (e) { toast(e.message, 'err') } finally { setBusy('') }
+    try { await download(`/republic/download${qs({ fmt, a, b, mode })}`, `Respublika_dinamikasi.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`) } catch (e) { toast(e.message, 'err') } finally { setBusy('') }
   }
   const dates = data?.dates || []
   const cur = data ? (data.pages.find((p) => p.n === pn) || data.pages[0]) : null
@@ -111,25 +113,34 @@ export default function Republic() {
         </div>
         <div className="filters">
           <label className="filter"><span><Globe2 size={15} />Hudud nomi:</span><b className="static-box">Qashqadaryo hududiy filiali</b></label>
-          {dates.length > 0 && (<label className="filter"><span><CalendarRange size={16} />Dinamika:</span>
+          <div className="seg" role="tablist" aria-label="Dinamika turi">
+            <button role="tab" aria-selected={mode === 'oy'} className={mode === 'oy' ? 'on' : ''} onClick={() => pick('oy')}><CalendarRange size={15} />Oy boshidan</button>
+            <button role="tab" aria-selected={mode === 'kunlik'} className={mode === 'kunlik' ? 'on' : ''} onClick={() => pick('kunlik')}><GitCompareArrows size={15} />Kunlik</button>
+          </div>
+          {dates.length > 0 && mode === 'oy' && (<label className="filter"><span><CalendarRange size={16} />Sana:</span>
+            <select value={data?.b || ''} onChange={(e) => setB(e.target.value)}>{dates.map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
+            <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button></label>)}
+          {dates.length > 1 && mode === 'kunlik' && (<label className="filter"><span><GitCompareArrows size={16} />Solishtirish:</span>
             <select value={data?.a || ''} onChange={(e) => setA(e.target.value)}>
-              <option value="">{data ? `${dmy(data.start)} (oy boshi)` : '—'}</option>
               {dates.filter((d) => !data || d < data.b).map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
-            <b>–</b>
+            <b>→</b>
             <select value={data?.b || ''} onChange={(e) => { setB(e.target.value); setA('') }}>{dates.map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
             <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button></label>)}
           <div className="spacer" />
           {can('report.download') && data && (<>
             <button className="btn ghost" disabled={!!busy} onClick={() => dl('pdf')}><FileText size={16} />PDF</button>
             <button className="btn ghost" disabled={!!busy} onClick={() => dl('xlsx')}><FileSpreadsheet size={16} />Excel</button>
-            <button className="btn ghost" disabled={!!busy} title="Respublika markazi yuborgan asl PDF fayl" onClick={() => dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
+            <button className="btn ghost" hidden={!can('republic.original')} disabled={!!busy} title="Respublika markazi yuborgan asl PDF fayl" onClick={() => dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
           {can('telegram.send') && data && <TgBotLink label="Telegram bot" />}
           {can('telegram.send') && data && <button className="btn primary" onClick={() => setSend(true)}><Send size={16} />Telegramga yuborish</button>}
         </div>
       </div>
       {err ? (
-        <div className="card pad"><Empty icon={Globe2}>{err}{can('data.upload') && <div style={{ marginTop: 10 }}><Link className="btn primary" to="/yuklash?t=resp"><UploadCloud size={16} />PDF yuklash</Link></div>}</Empty></div>
-      ) : !data ? <Spinner /> : (<>
+        <div className="card pad"><Empty icon={Globe2}>{err}{can('republic.upload') && <div style={{ marginTop: 10 }}><Link className="btn primary" to="/yuklash?t=resp"><UploadCloud size={16} />PDF yuklash</Link></div>}</Empty></div>
+      ) : !data ? <Spinner /> : mode === 'kunlik' && !data.a ? (
+        <div className="card pad"><Empty icon={GitCompareArrows}>Kunlik solishtirish uchun kamida ikkita sananing PDF'i kerak — hozir faqat bitta ({dmy(data.b)}) yuklangan.
+          {can('republic.upload') && <div style={{ marginTop: 10 }}><Link className="btn primary" to="/yuklash?t=resp"><UploadCloud size={16} />Yangi PDF yuklash</Link></div>}</Empty></div>
+      ) : (<>
         <div className="card tcard">
           <div className="tbl-scroll">
             <table className={`dyn-table t-${cur.key}`}>
@@ -151,9 +162,9 @@ export default function Republic() {
               </tbody>
             </table>
           </div>
-          <div className="note">{data.a ? <>Dinamika (↑↓): <b>{dmy(data.a)}</b> bilan <b>{dmy(data.b)}</b> o'rtasidagi o'zgarish.</> : <>Dinamika (↑↓): oy boshidan <b>{dmy(data.b)}</b> gacha (PDF bo'yicha). Kunma-kun solishtirish uchun yuqorida sanani tanlang.</>}</div>
+          <div className="note">{data.a ? <>Kunlik dinamika (↑↓): oxirgi ikki yuklangan PDF — <b>{dmy(data.a)}</b> bilan <b>{dmy(data.b)}</b> o'rtasidagi o'zgarish.</> : <>Dinamika (↑↓): oy boshidan <b>{dmy(data.b)}</b> gacha (respublika PDF'i bo'yicha). Oxirgi ikki kunni solishtirish uchun «Kunlik» ni tanlang.</>}</div>
         </div></>)}
-      {send && data && <SendModal a={data.a} b={data.b} onClose={() => setSend(false)} />}
+      {send && data && <SendModal a={data.a} b={data.b} mode={mode} onClose={() => setSend(false)} />}
     </div>
   )
 }

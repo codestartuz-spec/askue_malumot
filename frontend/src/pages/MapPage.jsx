@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Search, Layers, SlidersHorizontal, X, MapPinned, Crosshair, Info } from 'lucide-react'
+import { Search, Layers, SlidersHorizontal, X, MapPinned, Crosshair, Info, MapPin, Cpu, Activity, FilterX } from 'lucide-react'
 import { api, qs } from '../api'
 import { useAuth } from '../auth'
 import { METRIC_TITLES } from '../tables'
@@ -48,14 +48,15 @@ function tipHtml(p) {
     <div class="tip-n">Koordinata TP ga biriktirilgan hisoblagichlar markazi bo‘yicha aniqlangan</div></div></div>`
 }
 
-function StGroup({ title, list, sel, counts, onToggle }) {
+function StSelect({ title, list, value, counts, onChange }) {
+  const cur = list.find((x) => x.k === value)
   return (
-    <>
-      <div className="mp-sec">{title} <small>(tanlanmasa — hammasi)</small></div>
-      <div className="sts">{list.map(({ k, label, color }) => (
-        <button key={k} className={`st ${sel.has(k) ? 'on' : ''}`} onClick={() => onToggle(k)}>
-          <i style={{ background: color }} /><span>{label}</span>{counts && <b className="cnt">{num(counts[k] || 0)}</b>}</button>))}</div>
-    </>
+    <label className="field st-sel"><span>{title}</span>
+      <div className="sel-dot"><i style={{ background: cur ? cur.color : '#cbd5e1' }} />
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Hammasi</option>
+          {list.map(({ k, label }) => <option key={k} value={k}>{label}{counts ? ` — ${num(counts[k] || 0)}` : ''}</option>)}
+        </select></div></label>
   )
 }
 
@@ -67,10 +68,16 @@ export default function MapPage() {
   const brig = sp.get('brig') ?? ''
   const metric = sp.get('metric') || ''
   const focusLa = parseFloat(sp.get('la')), focusLo = parseFloat(sp.get('lo'))
-  const setParam = (k, v) => setSp((o) => { const n = new URLSearchParams(o); if (v === '' || v === null) n.delete(k); else n.set(k, v); return n }, { replace: true })
+  // Bir nechta parametrni BIR yo'la o'zgartirish (ketma-ket chaqirilsa, oxirgisi oldingisini bekor qilardi)
+  const setParams = (o) => setSp((cur) => { const n = new URLSearchParams(cur); Object.entries(o).forEach(([k, v]) => { if (v === '' || v === null) n.delete(k); else n.set(k, v) }); return n }, { replace: true })
+  const setParam = (k, v) => setParams({ [k]: v })
 
   const [kinds, setKinds] = useState(() => new Set(metricKinds(metric) || ['aholi', 'ulgurji', 'balans', 'tr']))
-  const [status, setStatus] = useState(new Set())
+  const [mSt, setMSt] = useState('')
+  const [tSt, setTSt] = useState('')
+  const [lSt, setLSt] = useState('')
+  const status = useMemo(() => new Set([mSt, tSt, lSt].filter(Boolean)), [mSt, tSt, lSt])
+  const [tab, setTab] = useState('hudud')
   const [layer, setLayer] = useState(() => localStorage.getItem('askue_map_layer') || 'osm')
   const [panel, setPanel] = useState(() => window.innerWidth > 900)
   const [info, setInfo] = useState(null)
@@ -192,6 +199,8 @@ export default function MapPage() {
     setFound([]); setQ('')
   }
   const toggle = (set, setter, k) => setter((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
+  const allKinds = metric ? metricKinds(metric) : ['aholi', 'ulgurji', 'balans', 'tr']
+  const clearAll = () => { setParams({ esp: '', brig: '', metric: '' }); setMSt(''); setTSt(''); setLSt(''); setKinds(new Set(['aholi', 'ulgurji', 'balans', 'tr'])) }
   const locate = () => map.current?.locate({ setView: true, maxZoom: 16 })
   useEffect(() => { setTimeout(() => map.current?.invalidateSize(), 320) }, [panel])
   const cov = stats && (stats.meters + stats.trs) ? stats : null
@@ -214,22 +223,40 @@ export default function MapPage() {
           {found.length > 0 && <div className="found">{found.map((r) => (
             <button key={r.t + r.id} onClick={() => goto(r)} className={r.la === null ? 'nogeo' : ''}>
               <span>{r.title}</span><small>{r.la === null ? "koordinata yo'q" : r.sub}</small></button>))}</div>}
+          <div className="mp-tabs" role="tablist">
+            <button role="tab" aria-selected={tab === 'hudud'} className={tab === 'hudud' ? 'on' : ''} onClick={() => setTab('hudud')}><MapPin size={15} />Hudud{(esp || brig !== '') && <i className="dot" />}</button>
+            <button role="tab" aria-selected={tab === 'qurilma'} className={tab === 'qurilma' ? 'on' : ''} onClick={() => setTab('qurilma')}><Cpu size={15} />Qurilma{kinds.size < 4 && <i className="dot" />}</button>
+            <button role="tab" aria-selected={tab === 'holat'} className={tab === 'holat' ? 'on' : ''} onClick={() => setTab('holat')}><Activity size={15} />Holat{status.size > 0 && <i className="dot" />}</button>
+          </div>
           {metric && <div className="mp-chip"><span>{METRIC_TITLES[metric] || metric}</span><button onClick={() => { setParam('metric', ''); setKinds(new Set(['aholi', 'ulgurji', 'balans', 'tr'])) }}><X size={14} /></button></div>}
-          <label className="field"><span>Tuman</span>
-            <select value={esp} onChange={(e) => { setParam('esp', e.target.value); setParam('brig', '') }}>
-              <option value="">Barcha tumanlar</option>{boot.esps.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}</select></label>
-          <label className="field"><span>Brigada</span>
-            <select value={brig} onChange={(e) => setParam('brig', e.target.value)}>
-              <option value="">Barcha brigadalar</option><option value="0">Biriktirilmagan</option>
-              {brigs.map((b) => <option key={b.id} value={b.id}>{b.name}{!esp ? ` — ${boot.esps.find((e) => e.id === b.esp_id)?.label}` : ''}</option>)}</select></label>
-          <div className="mp-sec">Qurilma turi</div>
-          <div className="kinds">{KINDS.map(({ k, c }) => (
-            <button key={k} className={`kind ${kinds.has(k) ? 'on' : ''}`} style={{ '--kc': c }} onClick={() => toggle(kinds, setKinds, k)} disabled={!!metric && metricKinds(metric)?.indexOf(k) === -1}>
-              <i dangerouslySetInnerHTML={{ __html: glyph(k, 17) }} /><span>{KIND_NAME[k]}</span></button>))}</div>
-          <StGroup title="Hisoblagich holati" list={METER_ST} sel={status} counts={counts} onToggle={(k) => toggle(status, setStatus, k)} />
-          <StGroup title="Konsentrator holati" list={TR_ST} sel={status} counts={counts} onToggle={(k) => toggle(status, setStatus, k)} />
-          <StGroup title="Konsentrator obxod darajasi" list={TR_LV} sel={status} counts={counts} onToggle={(k) => toggle(status, setStatus, k)} />
-          {status.size > 0 && <button className="btn ghost sm clr" onClick={() => setStatus(new Set())}><X size={14} />Holatlarni tozalash ({status.size})</button>}
+          {tab === 'hudud' && (<div className="mp-body">
+            <label className="field"><span>Tuman</span>
+              <select value={esp} onChange={(e) => setParams({ esp: e.target.value, brig: '' })}>
+                <option value="">Barcha tumanlar</option>{boot.esps.map((e) => <option key={e.id} value={String(e.id)}>{e.label}</option>)}</select></label>
+            <label className="field"><span>Brigada</span>
+              <select value={brig} onChange={(e) => setParam('brig', e.target.value)}>
+                <option value="">Barcha brigadalar</option><option value="0">Biriktirilmagan</option>
+                {brigs.map((b) => <option key={b.id} value={String(b.id)}>{b.name}{!esp ? ` — ${boot.esps.find((e) => e.id === b.esp_id)?.label}` : ''}</option>)}</select></label>
+          </div>)}
+          {tab === 'qurilma' && (<div className="mp-body">
+            <div className="mp-sec">Xaritada ko'rsatiladigan qurilmalar</div>
+            <div className="kinds">{KINDS.map(({ k, c }) => (
+              <button key={k} className={`kind ${kinds.has(k) ? 'on' : ''}`} style={{ '--kc': c }} onClick={() => toggle(kinds, setKinds, k)} disabled={!!metric && metricKinds(metric)?.indexOf(k) === -1}>
+                <i dangerouslySetInnerHTML={{ __html: glyph(k, 17) }} /><span>{KIND_NAME[k]}</span></button>))}</div>
+          </div>)}
+          {tab === 'holat' && (<div className="mp-body">
+            <StSelect title="Hisoblagich holati" list={METER_ST} value={mSt} counts={counts} onChange={setMSt} />
+            <StSelect title="Konsentrator holati" list={TR_ST} value={tSt} counts={counts} onChange={setTSt} />
+            <StSelect title="Konsentrator obxod darajasi" list={TR_LV} value={lSt} counts={counts} onChange={setLSt} />
+            <small className="hint">Bir nechta tanlansa — ulardan birortasiga mos qurilmalar ko'rsatiladi.</small>
+          </div>)}
+          {(esp || brig !== '' || status.size > 0 || kinds.size < allKinds.length) && (
+            <div className="mp-active">
+              {esp && <span className="chip on">{boot.esps.find((e) => String(e.id) === esp)?.label}</span>}
+              {brig !== '' && <span className="chip on">{brig === '0' ? 'Biriktirilmagan' : boot.brigades.find((b) => String(b.id) === brig)?.name}</span>}
+              {[...status].map((k) => { const it = [...METER_ST, ...TR_ST, ...TR_LV].find((x) => x.k === k); return it && <span key={k} className="chip on"><i style={{ background: it.color }} />{it.label}</span> })}
+              <button className="lnk" onClick={clearAll}><FilterX size={13} />Tozalash</button>
+            </div>)}
           <div className="mp-info">
             {info && <div><Info size={14} />Ko‘rinishda: <b>{num(info.meters)}</b> hisoblagich, <b>{num(info.trs)}</b> konsentrator{info.mode === 'clusters' ? ' (guruhlangan — yaqinlashtiring)' : ''}</div>}
             {cov && <div className="mut">Koordinatasi kiritilgan: hisoblagich {num(cov.meters_geo)} / {num(cov.meters)}, konsentrator {num(cov.trs_geo)} / {num(cov.trs)}</div>}

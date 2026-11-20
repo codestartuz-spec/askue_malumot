@@ -8,6 +8,8 @@ COLUMNS = [
     ("users", "chat_id", "VARCHAR(30) NULL"),
     ("trs", "lat", "DOUBLE NULL"),
     ("trs", "lon", "DOUBLE NULL"),
+    ("tg_chats", "members", "INT NULL"),
+    ("tg_chats", "members_at", "DATETIME NULL"),
     ("snapshots", "out_2_7", "INT NOT NULL DEFAULT 0"),
     ("snapshots", "m_direct", "INT NOT NULL DEFAULT 0"),
 ]

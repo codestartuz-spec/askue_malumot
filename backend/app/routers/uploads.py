@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
-from ..deps import need
+from ..deps import log, need
 from ..models import Job, User
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
@@ -38,7 +38,7 @@ def _date_from(name: str | None) -> date | None:
 def job_out(j) -> dict:
     return {"id": j.id, "status": j.status, "progress": j.progress, "stage": j.stage,
             "message": j.message, "snap_date": j.snap_date.isoformat(), "stats": j.stats,
-            "area_name": j.area_name, "details_name": j.details_name, "created_by": j.created_by,
+            "area_name": j.area_name, "has_snapshot": j.status == "done", "details_name": j.details_name, "created_by": j.created_by,
             "created_at": j.created_at.isoformat(),
             "finished_at": j.finished_at.isoformat() if j.finished_at else None}
 
@@ -80,3 +80,30 @@ def job(jid: int, _: User = Depends(need("data.upload")), db: Session = Depends(
     if not j:
         raise HTTPException(404, "Topilmadi")
     return job_out(j)
+
+
+@router.delete("/jobs/{jid}")
+def delete_job(jid: int, user: User = Depends(need("data.delete")), db: Session = Depends(get_db)):
+    """Yuklash yozuvini, serverdagi fayllarni va (boshqa yuklash qolmasa) shu sana dinamikasini o'chiradi.
+    Hisoblagich/TP ro'yxatlari (joriy holat) o'zgarmaydi — ular keyingi yuklash bilan yangilanadi."""
+    import os
+    j = db.get(Job, jid)
+    if not j:
+        raise HTTPException(404, "Topilmadi")
+    if j.status == "running":
+        raise HTTPException(400, "Bajarilayotgan yuklashni o'chirib bo'lmaydi. Tugashini kuting")
+    for p in (j.area_path, j.details_path):
+        if p:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    d = j.snap_date
+    others = db.scalar(text("SELECT COUNT(*) FROM jobs WHERE snap_date=:d AND status='done' AND id<>:i"), {"d": d, "i": jid})
+    removed = 0
+    if j.status == "done" and not others:
+        removed = db.execute(text("DELETE FROM snapshots WHERE snap_date=:d"), {"d": d}).rowcount
+    log(db, user.username, "yuklash_ochirish", f"#{jid} {d.isoformat()} (dinamika qatorlari: {removed})")
+    db.delete(j)
+    db.commit()
+    return {"ok": True, "snapshot_removed": bool(removed)}

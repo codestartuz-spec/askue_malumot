@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import SessionLocal, engine, get_db
-from ..deps import log, need, need_any
+from ..deps import has_perm, log, need, need_any
 from ..models import RepublicReport, User
 from ..services import republic as R
 from ..services import telegram as tg
@@ -26,7 +26,7 @@ def _dates(db: Session) -> list[RepublicReport]:
 
 
 @router.post("/upload")
-def upload(file: UploadFile = File(...), user: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+def upload(file: UploadFile = File(...), user: User = Depends(need("republic.upload")), db: Session = Depends(get_db)):
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "Faqat PDF fayl qabul qilinadi")
     data = file.file.read(MAX_PDF + 1)
@@ -61,24 +61,46 @@ def upload(file: UploadFile = File(...), user: User = Depends(need("data.upload"
 
 
 @router.get("")
-def listing(_: User = Depends(need_any("republic.view", "data.upload")), db: Session = Depends(get_db)):
+def listing(_: User = Depends(need_any("republic.view", "republic.upload")), db: Session = Depends(get_db)):
     return [{"id": r.id, "end": r.end_date.isoformat(), "start": r.start_date.isoformat() if r.start_date else None,
              "filename": r.filename, "by": r.uploaded_by, "at": r.uploaded_at.isoformat(),
-             "pages": len(r.data.get("pages", []))} for r in _dates(db)]
+             "pages": len(r.data.get("pages", [])),
+             "has_file": (settings.data_dir / "republic" / f"{r.end_date.isoformat()}.pdf").exists()} for r in _dates(db)]
 
 
 @router.delete("/{rid}")
-def delete(rid: int, user: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+def delete(rid: int, user: User = Depends(need("data.delete")), db: Session = Depends(get_db)):
     r = db.get(RepublicReport, rid)
     if not r:
         raise HTTPException(404, "Topilmadi")
     log(db, user.username, "respublika_ochirish", r.end_date.isoformat())
+    f = settings.data_dir / "republic" / f"{r.end_date.isoformat()}.pdf"
     db.delete(r)
     db.commit()
+    try:
+        f.unlink(missing_ok=True)
+    except OSError:
+        pass
     return {"ok": True}
 
 
-def _pick(db: Session, a: str | None, b: str | None):
+@router.get("/{rid}/file")
+def file(rid: int, inline: bool = False, user: User = Depends(need("republic.original")),
+         db: Session = Depends(get_db)):
+    """Serverda saqlangan asl PDF: brauzerda ochish (inline) yoki yuklab olish."""
+    from urllib.parse import quote
+    r = db.get(RepublicReport, rid)
+    if not r:
+        raise HTTPException(404, "Topilmadi")
+    f = settings.data_dir / "republic" / f"{r.end_date.isoformat()}.pdf"
+    if not f.exists():
+        raise HTTPException(404, "Fayl serverda topilmadi — shu sanani qayta yuklang")
+    name = r.filename or f"Respublika_{r.end_date.isoformat()}.pdf"
+    return Response(f.read_bytes(), media_type="application/pdf",
+                    headers={"Content-Disposition": f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(name)}"})
+
+
+def _pick(db: Session, a: str | None, b: str | None, mode: str = "oy"):
     reps = _dates(db)
     if not reps:
         raise HTTPException(400, "Hali respublika PDF'i yuklanmagan")
@@ -90,14 +112,16 @@ def _pick(db: Session, a: str | None, b: str | None):
         aa = by.get(a)
         if not aa:
             raise HTTPException(400, "Solishtiriladigan sana topilmadi")
-    else:   # oldingi eng yaqin sana
+    elif mode == "oy":   # PDF'ning o'z dinamikasi: oy boshidan
+        aa = None
+    else:   # kunlik: oldingi eng yaqin sana
         older = [r for r in reps if r.end_date < bb.end_date]
         aa = older[0] if older else None
     return aa, bb
 
 
-def _build(db: Session, a: str | None, b: str | None):
-    aa, bb = _pick(db, a, b)
+def _build(db: Session, a: str | None, b: str | None, mode: str = "oy"):
+    aa, bb = _pick(db, a, b, mode)
     start = bb.start_date or date(bb.end_date.year, bb.end_date.month, 1)
     base_iso = (aa.end_date if aa else start).isoformat()
     pages = R.compare(aa.data if aa else None, bb.data, base_iso, bb.end_date.isoformat())
@@ -105,10 +129,10 @@ def _build(db: Session, a: str | None, b: str | None):
 
 
 @router.get("/compare")
-def compare(a: str | None = None, b: str | None = None, _: User = Depends(need("republic.view")),
+def compare(a: str | None = None, b: str | None = None, mode: str = "oy", _: User = Depends(need("republic.view")),
             db: Session = Depends(get_db)):
-    pages, ad, bd, start = _build(db, a, b)
-    return {"a": ad.isoformat() if ad else None, "b": bd.isoformat(), "start": start.isoformat(), "pages": pages,
+    pages, ad, bd, start = _build(db, a, b, mode)
+    return {"mode": mode, "a": ad.isoformat() if ad else None, "b": bd.isoformat(), "start": start.isoformat(), "pages": pages,
             "dates": [r.end_date.isoformat() for r in _dates(db)]}
 
 
@@ -134,9 +158,9 @@ def upgrade_stored() -> int:
     return n
 
 
-def make_file(db: Session, fmt: str, a: str | None, b: str | None) -> tuple[str, bytes, str]:
+def make_file(db: Session, fmt: str, a: str | None, b: str | None, mode: str = "oy") -> tuple[str, bytes, str]:
     from ..services import reports as RP
-    pages, ad, bd, start = _build(db, a, b)
+    pages, ad, bd, start = _build(db, a, b, mode)
     if fmt == "orig":
         f = settings.data_dir / "republic" / f"{bd.isoformat()}.pdf"
         if not f.exists():
@@ -154,12 +178,14 @@ def make_file(db: Session, fmt: str, a: str | None, b: str | None) -> tuple[str,
 
 
 @router.get("/download")
-def download(fmt: str = "pdf", a: str | None = None, b: str | None = None,
+def download(fmt: str = "pdf", a: str | None = None, b: str | None = None, mode: str = "oy",
              _: User = Depends(need("republic.view")), user: User = Depends(need("report.download")),
              db: Session = Depends(get_db)):
     if fmt not in MIME:
         raise HTTPException(400, "Noto'g'ri format")
-    name, blob, _c = make_file(db, fmt, a, b)
+    if fmt == "orig" and not has_perm(user, "republic.original"):
+        raise HTTPException(403, "Bu amal uchun ruxsat yo'q")
+    name, blob, _c = make_file(db, fmt, a, b, mode)
     from urllib.parse import quote
     return Response(blob, media_type=MIME[fmt],
                     headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
@@ -170,10 +196,11 @@ class SendIn(BaseModel):
     chat_ids: list[int]
     a: str | None = None
     b: str | None = None
+    mode: str = "oy"
     ack: bool = True
 
 
-def _run(job_id: int, fmts, chats, a, b, post_id: int = 0, pitems: dict | None = None, ack: bool = False):
+def _run(job_id: int, fmts, chats, a, b, post_id: int = 0, pitems: dict | None = None, ack: bool = False, mode: str = "oy"):
     from ..services import posts as P
     pitems = pitems or {}
     chat_err: dict[str, str] = {}
@@ -189,7 +216,7 @@ def _run(job_id: int, fmts, chats, a, b, post_id: int = 0, pitems: dict | None =
         for fmt in fmts:
             try:
                 with SessionLocal() as db:
-                    name, blob, cap = make_file(db, fmt, a, b)
+                    name, blob, cap = make_file(db, fmt, a, b, mode)
             except HTTPException as e:
                 lines.append(f"✗ {fmt}: {e.detail}")
                 fails += len(chats); done += len(chats); flush()
@@ -236,7 +263,7 @@ def send(body: SendIn, user: User = Depends(need("telegram.send")), _p: User = D
         raise HTTPException(400, "Tanlangan kanallar topilmadi")
     if not db.execute(text("SELECT 1 FROM kv WHERE k='tg_token'")).first():
         raise HTTPException(400, "Telegram bot sozlanmagan (Sozlamalar bo'limi)")
-    _build(db, body.a, body.b)   # mavjudligini tekshiradi
+    _build(db, body.a, body.b, body.mode)   # mavjudligini tekshiradi
     db.execute(text("INSERT INTO send_jobs (status,progress,log,created_by,created_at) VALUES ('running',0,'',:u,:t)"),
                {"u": user.username, "t": datetime.now()})
     job_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
@@ -244,5 +271,5 @@ def send(body: SendIn, user: User = Depends(need("telegram.send")), _p: User = D
     db.commit()
     from ..services import posts as P
     pid, pitems = P.create_post("respublika", "Respublika dinamikasi", "", [], body.ack, user.username, chats)
-    threading.Thread(target=_run, daemon=True, args=(job_id, body.fmts, chats, body.a, body.b, pid, pitems, body.ack)).start()
+    threading.Thread(target=_run, daemon=True, args=(job_id, body.fmts, chats, body.a, body.b, pid, pitems, body.ack, body.mode)).start()
     return {"id": job_id}

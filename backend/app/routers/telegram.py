@@ -31,14 +31,19 @@ def _set_kv(db: Session, k: str, v: str) -> None:
 
 
 def _chats(db: Session, only_active: bool) -> list[dict]:
-    q = "SELECT id, chat_id, title, kind, username, source, is_active FROM tg_chats"
+    q = "SELECT id, chat_id, title, kind, username, source, is_active, members, members_at FROM tg_chats"
     if only_active:
         q += " WHERE is_active=1"
-    return [dict(r) for r in db.execute(text(q + " ORDER BY kind, title")).mappings()]
+    out = [dict(r) for r in db.execute(text(q + " ORDER BY kind, title")).mappings()]
+    for r in out:
+        r["members_at"] = r["members_at"].isoformat() if r["members_at"] else None
+    if out and _kv(db, "tg_token"):
+        tg.refresh_members_bg(30)
+    return out
 
 
 @router.get("")
-def overview(_: User = Depends(need_any("settings.manage", "telegram.send", "system.view", "backup.manage")), db: Session = Depends(get_db)):
+def overview(_: User = Depends(need_any("settings.manage", "telegram.send", "telegram.message", "telegram.journal", "system.view", "backup.manage")), db: Session = Depends(get_db)):
     token = _kv(db, "tg_token")
     hb = _kv(db, "tg_poll_hb")
     return {"configured": bool(token), "token": _mask(token), "bot_username": _kv(db, "tg_bot_username"),
@@ -98,9 +103,17 @@ def add_chat(body: ChatIn, me: User = Depends(need("settings.manage")), db: Sess
     except tg.TgError:
         warn = "Botning huquqlarini tekshirib bo'lmadi"
     tg.upsert_chat(chat, source="manual")
+    tg.refresh_members_bg(0)
     log(db, me.username, "telegram_kanal", f"Qo'shildi: {chat.get('title')} ({chat['id']})")
     db.commit()
     return {"ok": True, "title": chat.get("title"), "warning": warn}
+
+
+@router.post("/chats/refresh")
+def refresh_chats(_: User = Depends(need_any("settings.manage", "telegram.send", "telegram.message")), db: Session = Depends(get_db)):
+    """A'zolar sonini hozir yangilash."""
+    n = tg.refresh_members(0)
+    return {"updated": n, "chats": _chats(db, False)}
 
 
 @router.delete("/chats/{cid}")
@@ -112,7 +125,7 @@ def del_chat(cid: int, me: User = Depends(need("settings.manage")), db: Session 
 
 
 @router.get("/chats")
-def active_chats(_: User = Depends(need_any("telegram.send", "settings.manage")), db: Session = Depends(get_db)):
+def active_chats(_: User = Depends(need_any("telegram.send", "telegram.message", "settings.manage")), db: Session = Depends(get_db)):
     return _chats(db, True)
 
 
@@ -159,7 +172,7 @@ def _run_msg(job_id: int, chats: list[tuple[str, str]], msg: str, files: list[tu
 
 @router.post("/send")
 async def send_message(chat_ids: str = Form(...), message: str = Form(""), ack: bool = Form(True), files: list[UploadFile] = File(default=[]),
-                       me: User = Depends(need("telegram.send")), db: Session = Depends(get_db)):
+                       me: User = Depends(need("telegram.message")), db: Session = Depends(get_db)):
     """Kanal / guruhlarga matn, rasm yoki video yuborish (fon rejimida, jarayon /reports/send/{id} orqali)."""
     ids = [int(x) for x in chat_ids.split(",") if x.strip().isdigit()]
     files = [f for f in files if f.filename]

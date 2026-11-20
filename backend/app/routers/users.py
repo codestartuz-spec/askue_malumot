@@ -91,3 +91,26 @@ def patch_user(uid: int, body: UserPatch, me: User = Depends(sadmin_only), db: S
     log(db, me.username, "xodim_o'zgardi", f"{u.username}: {'; '.join(changes) or 'ism'}")
     db.commit()
     return user_out(u)
+
+
+@router.delete("/{uid}")
+def delete_user(uid: int, me: User = Depends(sadmin_only), db: Session = Depends(get_db)):
+    """Xodimni butunlay o'chiradi (qaytarib bo'lmaydi). Harakatlar jurnalidagi yozuvlar login nomi bilan qoladi."""
+    from sqlalchemy import text
+    u = db.get(User, uid)
+    if not u:
+        raise HTTPException(404, "Topilmadi")
+    if u.is_super:
+        raise HTTPException(400, "Sadminni o'chirib bo'lmaydi")
+    if u.id == me.id:
+        raise HTTPException(400, "O'zingizni o'chira olmaysiz")
+    name = u.username
+    try:
+        db.execute(text("DELETE FROM pw_resets WHERE user_id=:i"), {"i": uid})
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        u = db.get(User, uid)
+    db.delete(u)
+    log(db, me.username, "xodim_ochirildi", name)
+    db.commit()
+    return {"ok": True}

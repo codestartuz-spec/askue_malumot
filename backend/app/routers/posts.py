@@ -22,7 +22,7 @@ def _files(v) -> list:
 
 
 @router.get("")
-def listing(kind: str = "", page: int = 1, size: int = 25, _: User = Depends(need("telegram.send")),
+def listing(kind: str = "", page: int = 1, size: int = 25, _: User = Depends(need("telegram.journal")),
             db: Session = Depends(get_db)):
     size = max(5, min(size, 100))
     where, params = "", {"lim": size, "off": (max(page, 1) - 1) * size}
@@ -42,7 +42,7 @@ def listing(kind: str = "", page: int = 1, size: int = 25, _: User = Depends(nee
 
 
 @router.get("/{pid}")
-def detail(pid: int, _: User = Depends(need("telegram.send")), db: Session = Depends(get_db)):
+def detail(pid: int, _: User = Depends(need("telegram.journal")), db: Session = Depends(get_db)):
     p = db.execute(text("SELECT id, kind, title, body, files, ack, created_by, created_at FROM tg_posts WHERE id=:i"),
                    {"i": pid}).mappings().first()
     if not p:

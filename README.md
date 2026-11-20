@@ -4,7 +4,38 @@ Qashqadaryo hududiy filiali uchun CAS (ASKUE) ma'lumotlari monitoringi: konsentr
 
 **Texnologiyalar:** Python (FastAPI) · MySQL · React (Vite). Yuklash navbat (job) orqali alohida *worker* jarayonida bajariladi.
 
-## Ishga tushirish (Windows)
+## Serverga joylash (Docker + Cloudflare Tunnel)
+
+Tizim 4 ta konteynerdan iborat: **mysql**, **api** (FastAPI + tayyor frontend), **worker** (yuklash navbati, Telegram bot, zaxira) va ixtiyoriy **cloudflared** (internetga chiqarish). MySQL tashqariga ochilmaydi, API faqat `127.0.0.1:8000` da ochiq turadi, internetga faqat Cloudflare Tunnel orqali chiqadi.
+
+**1. GitHub'ga yuklash** (`.env`, `backend/data`, `node_modules` avtomatik e'tiborsiz qoldiriladi):
+```
+git init && git add . && git commit -m "ASKUE" && git branch -M main
+git remote add origin git@github.com:<akkaunt>/<repo>.git && git push -u origin main
+```
+
+**2. Cloudflare'da tunnel yaratish** (bir marta): Zero Trust → Networks → Tunnels → *Create a tunnel* (Cloudflared) → token'ni nusxalang. *Public hostname*: o'zingizning domeningiz (masalan `askue.example.uz`), *Service*: `HTTP` → `api:8000`.
+
+**3. Serverda (Ubuntu/Debian, SSH orqali)** — bitta buyruq:
+```
+git clone git@github.com:<akkaunt>/<repo>.git askue && cd askue
+cp .env.example .env && nano .env      # faqat CLOUDFLARE_TUNNEL_TOKEN=... ni yozing (parollar o'zi to'ldiriladi)
+bash deploy.sh
+```
+`deploy.sh` Docker'ni o'rnatadi (yo'q bo'lsa), parol va maxfiy kalitlarni tasodifiy yaratadi, tizimni yig'adi va ishga tushiradi; oxirida sadmin paroli ekranga chiqadi (u `.env` da ham saqlanadi). Tunnel tokeni bo'lmasa tunnel yoqilmaydi — tizim `http://<server>:8000` da (`API_BIND=0.0.0.0` qilsangiz) ishlaydi.
+
+**Keyingi yangilashlar:** o'zgarishni GitHub'ga `git push` qiling, serverda `bash deploy.sh` — kod olinadi, qayta yig'iladi, ma'lumotlar (baza, yuklangan fayllar, zaxiralar) Docker volume'larda saqlanib qoladi.
+
+| Buyruq | Vazifasi |
+|---|---|
+| `bash deploy.sh status` | konteynerlar holati |
+| `bash deploy.sh logs api` | jurnal (`api`, `worker`, `mysql`, `cloudflared`) |
+| `bash deploy.sh backup` | bazani `backups/` ga `.sql.gz` qilib saqlash |
+| `bash deploy.sh restart` / `stop` | qayta ishga tushirish / to'xtatish |
+
+Eslatma: Cloudflare bepul tarifida bitta so'rov hajmi **100 MB** bilan cheklangan. Area/Details fayllari shundan katta bo'lsa, yuklashni serverning ichki manzilidan (`http://127.0.0.1:8000`, SSH tunnel orqali) bajaring yoki tarifni oshiring.
+
+## Ishga tushirish (Windows, mahalliy)
 
 1. MySQL tayyor bo'lsin (o'rnatilgan MySQL yoki `docker compose up -d` — `docker-compose.yml` tayyor, parol `root`, baza `askue`).
 2. `setup.bat` — kutubxonalarni o'rnatadi va `backend\.env` yaratadi. Ofis proksisi bo'lsa, `setup.bat` ichidagi `ASKUE_PROXY` qatorini yoqing.

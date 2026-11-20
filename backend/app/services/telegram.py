@@ -315,3 +315,36 @@ def poll_forever() -> None:
 
 def start_polling() -> None:
     threading.Thread(target=poll_forever, daemon=True, name="tg-poll").start()
+
+
+def refresh_members(max_age_min: int = 0) -> int:
+    """Faol kanal/guruhlardagi a'zolar sonini Telegram'dan yangilaydi (max_age_min — shu daqiqadan yangisini o'tkazib yuboradi)."""
+    n = 0
+    with engine.connect() as c:
+        rows = c.execute(text("SELECT id, chat_id, members_at FROM tg_chats WHERE is_active=1")).all()
+    for rid, chat_id, at in rows:
+        if max_age_min and at and (datetime.now() - at).total_seconds() < max_age_min * 60:
+            continue
+        try:
+            cnt = call("getChatMemberCount", {"chat_id": chat_id}, timeout=15, retries=1)
+        except TgError:
+            continue
+        with engine.begin() as c:
+            c.execute(text("UPDATE tg_chats SET members=:m, members_at=:t WHERE id=:i"),
+                      {"m": int(cnt), "t": datetime.now(), "i": rid})
+        n += 1
+    return n
+
+
+_ref_lock = threading.Lock()
+
+
+def refresh_members_bg(max_age_min: int = 30) -> None:
+    def run():
+        if not _ref_lock.acquire(blocking=False):
+            return
+        try:
+            refresh_members(max_age_min)
+        finally:
+            _ref_lock.release()
+    threading.Thread(target=run, daemon=True).start()

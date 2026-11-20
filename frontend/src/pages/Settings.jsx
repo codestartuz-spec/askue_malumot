@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Bot, Megaphone, Users, Plus, Trash2, Send, PlugZap, Unplug, KeyRound, BookOpen, RefreshCw, ShieldAlert, Settings2, Activity, DatabaseBackup } from 'lucide-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { Confirm, Spinner, useToast } from '../ui'
+import { Members, Confirm, Spinner, useToast } from '../ui'
 import TgBotLink from '../TgBot'
 import SystemStatus from './SystemStatus'
 import Backup from './Backup'
@@ -82,12 +82,12 @@ export default function Settings() {
           </section>
 
           <section className="card pad set-card">
-            <h3><Megaphone size={20} />Kanal va guruhlar <span className="grow" /><button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button></h3>
+            <h3><Megaphone size={20} />Kanal va guruhlar <span className="grow" /><button className="icon-btn" title="Yangilash" onClick={() => api.post('/telegram/chats/refresh').then(() => { load(); toast("A'zolar soni yangilandi") }).catch((e) => toast(e.message, 'err'))}><RefreshCw size={16} /></button></h3>
             {d.chats.length === 0 ? <div className="empty sm grow-fill"><Megaphone size={32} /><div>Hali kanal yoki guruh yo'q</div><small>Botni kanalga admin qilib qo'shing — u shu yerda paydo bo'ladi</small></div> : (
               <div className="chat-list grow-fill">{d.chats.map((c) => (
                 <div key={c.id} className={`chat static ${c.is_active ? '' : 'off'}`}>
                   <i>{c.kind === 'kanal' ? <Megaphone size={18} /> : <Users size={18} />}</i>
-                  <span><b>{c.title}</b><small>{c.kind}{c.username ? ` • @${c.username}` : ''} • {c.source === 'auto' ? 'avtomatik aniqlangan' : "qo'lda qo'shilgan"} • <span className="mono">{c.chat_id}</span>{!c.is_active ? " • bot chiqarib yuborilgan" : ''}</small></span>
+                  <span><b>{c.title} <Members c={c} /></b><small>{c.kind}{c.username ? ` • @${c.username}` : ''} • {c.source === 'auto' ? 'avtomatik aniqlangan' : "qo'lda qo'shilgan"} • <span className="mono">{c.chat_id}</span>{!c.is_active ? " • bot chiqarib yuborilgan" : ''}</small></span>
                   {can('settings.manage') && <button className="icon-btn danger" onClick={() => delChat(c)} title="Olib tashlash"><Trash2 size={17} /></button>}
                 </div>))}</div>)}
             {d.configured && can('settings.manage') && (

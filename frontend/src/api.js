@@ -50,6 +50,19 @@ export async function download(path, filename) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 500)
 }
 
+// Faylni yangi oynada ochish (PDF ko'rish) — token bilan olinadi
+export async function openFile(path) {
+  const w = window.open('', '_blank')
+  try {
+    const res = await request(path)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    if (w) w.location.href = url
+    else window.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000)
+  } catch (e) { w?.close(); throw e }
+}
+
 // Fayl yuklash (jarayon foizi bilan)
 export function uploadForm(path, form, onProgress) {
   return new Promise((resolve, reject) => {

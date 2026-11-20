@@ -3,3 +3,7 @@ backend/.env
 backend/data/
 __pycache__/
 frontend/node_modules/
+
+.env
+backups/
+frontend/dist/

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { UploadCloud, FileArchive, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, CalendarDays, X, Rocket, Server, Globe2, FileText, Trash2 } from 'lucide-react'
-import { api, uploadForm } from '../api'
+import { Eye, Download, UploadCloud, FileArchive, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, CalendarDays, X, Rocket, Server, Globe2, FileText, Trash2 } from 'lucide-react'
+import { api, download, openFile, qs, uploadForm } from '../api'
 import { useAuth } from '../auth'
-import { useToast } from '../ui'
+import { Confirm, useToast } from '../ui'
 import { dmy, dt, num } from '../fmt'
 
 const dateFromName = (n = '') => {
@@ -36,7 +36,7 @@ const STATUS = {
   error: { t: 'Xatolik', c: 'red', i: XCircle },
 }
 
-function JobCard({ j }) {
+function JobCard({ j, onDelete }) {
   const S = STATUS[j.status]
   const active = j.status === 'queued' || j.status === 'running'
   return (
@@ -45,10 +45,11 @@ function JobCard({ j }) {
         <span className={`tag ${S.c}`}><S.i size={14} className={j.status === 'running' ? 'spin' : ''} />{S.t}</span>
         <b>#{j.id}</b><span className="mut"><CalendarDays size={14} /> {dmy(j.snap_date)}</span>
         <span className="mut right">{dt(j.created_at)} • {j.created_by}</span>
+        {onDelete && j.status !== 'running' && <button className="icon-btn danger" title="Yuklashni o'chirish" onClick={() => onDelete(j)}><Trash2 size={16} /></button>}
       </div>
       <div className="job-files">{[j.area_name, j.details_name].filter(Boolean).join('  +  ')}</div>
-      {(active || j.status === 'done') && (
-        <div className="progress"><div className="bar" style={{ width: `${j.progress}%` }} /><span>{Math.round(j.progress)}%</span></div>)}
+      {active && (
+        <div className={`progress st-${j.status}`}><div className="bar" style={{ width: `${Math.max(j.progress, j.status === 'queued' ? 4 : 0)}%` }} /><span>{j.status === 'queued' ? 'Navbat kutilmoqda' : `${Math.round(j.progress)}%`}</span></div>)}
       {active && <div className="stage">{j.stage}</div>}
       {j.status === 'error' && <div className="job-err"><AlertTriangle size={16} />{j.message}</div>}
       {j.status === 'done' && j.stats && (
@@ -79,7 +80,11 @@ function RepUpload() {
       setFile(null); load()
     } catch (e) { toast(e.message, 'err') } finally { setPct(null) }
   }
-  const del = async (r) => { if (!window.confirm(`${dmy(r.end)} sanadagi respublika ma'lumoti o'chirilsinmi?`)) return; try { await api.del(`/republic/${r.id}`); load() } catch (e) { toast(e.message, 'err') } }
+  const { can } = useAuth()
+  const [ask, setAsk] = useState(null)
+  const del = async () => { const r = ask; setAsk(null); try { await api.del(`/republic/${r.id}`); toast(`${dmy(r.end)} o'chirildi`); load() } catch (e) { toast(e.message, 'err') } }
+  const view = (r) => openFile(`/republic/${r.id}/file?inline=1`).catch((e) => toast(e.message, 'err'))
+  const dl = (r) => download(`/republic/${r.id}/file`, r.filename).catch((e) => toast(e.message, 'err'))
   return (<>
     <div className="card pad">
       <div className="drops one"><Drop icon={Globe2} label="Respublika dinamikasi (PDF)" hint="Qashqadaryo_HETK_dynamic-01.11.2026--20.11.2026.pdf — oy boshidan oxirgi sanagacha" accept=".pdf" file={file} onFile={setFile} /></div>
@@ -93,28 +98,42 @@ function RepUpload() {
     <h3 className="sec-title">Yuklangan sanalar</h3>
     {!list ? null : list.length === 0 ? <div className="card pad mut">Hali respublika PDF'i yuklanmagan.</div> : (
       <div className="card tcard"><div className="tbl-scroll"><table className="list"><thead><tr><th>Sana</th><th>Davr</th><th>Fayl</th><th>Jadvallar</th><th>Yuklagan</th><th /></tr></thead>
-        <tbody>{list.map((r) => (<tr key={r.id}><td className="b">{dmy(r.end)}</td><td>{dmy(r.start)} – {dmy(r.end)}</td><td className="mut"><FileText size={14} /> {r.filename}</td><td>{r.pages}</td><td className="mut">{r.by} • {dt(r.at)}</td>
-          <td className="acts"><button className="icon-btn danger" title="O'chirish" onClick={() => del(r)}><Trash2 size={16} /></button></td></tr>))}</tbody></table></div></div>)}
+        <tbody>{list.map((r) => (<tr key={r.id}><td className="b">{dmy(r.end)}</td><td className="nowrap-d">{dmy(r.start)} – {dmy(r.end)}</td><td className="mut"><FileText size={14} /> {r.filename}</td><td>{r.pages}</td><td className="mut">{r.by} • {dt(r.at)}</td>
+          <td className="acts">
+          {can('republic.original') && r.has_file && <><button className="btn ghost sm" title="PDF'ni brauzerda ochish" onClick={() => view(r)}><Eye size={15} />Ko'rish</button>
+            <button className="btn ghost sm" title="PDF'ni yuklab olish" onClick={() => dl(r)}><Download size={15} />Yuklab olish</button></>}
+          {can('republic.original') && !r.has_file && <small className="mut">Fayl serverda yo'q</small>}
+          {can('data.delete') && <button className="icon-btn danger" title="O'chirish" onClick={() => setAsk(r)}><Trash2 size={16} /></button>}</td></tr>))}</tbody></table></div></div>)}
+    {ask && <Confirm icon={Trash2} danger title="Respublika ma'lumotini o'chirish" ok="Ha, o'chirish" onOk={del} onCancel={() => setAsk(null)}>
+      <b>{dmy(ask.end)}</b> sanadagi respublika dinamikasi ({ask.filename}) o'chiriladi: jadval ma'lumoti va serverdagi PDF fayl. Qaytarib bo'lmaydi.
+      <small className="hint">Kunlik solishtirish endi oldingi sanalar bilan hisoblanadi.</small></Confirm>}
   </>)
 }
 
 export default function Upload() {
   const [sp, setSp] = useSearchParams()
-  const tab = sp.get('t') === 'resp' ? 'resp' : 'kunlik'
+  const { can } = useAuth()
+  const canD = can('data.upload'), canR = can('republic.upload')
+  const tab = (sp.get('t') === 'resp' && canR) || !canD ? 'resp' : 'kunlik'
   return (
     <div className="upl">
-      <div className="tabs" role="tablist">
+      {canD && canR && <div className="tabs" role="tablist">
         <button role="tab" className={`tab ${tab === 'kunlik' ? 'on' : ''}`} onClick={() => setSp({}, { replace: true })}><UploadCloud size={18} /><span>Kunlik ma'lumot (Area / Details)</span></button>
         <button role="tab" className={`tab ${tab === 'resp' ? 'on' : ''}`} onClick={() => setSp({ t: 'resp' }, { replace: true })}><Globe2 size={18} /><span>Respublika dinamikasi</span></button>
-        <i className="tab-glow" style={{ '--i': tab === 'resp' ? 1 : 0, '--n': 2 }} />
-      </div>
+      </div>}
       {tab === 'resp' ? <><div className="card head-card"><div className="titles"><h2 className="ttl">Respublika dinamikasi</h2><p className="sub">Respublika markazi tayyorlagan dinamika PDF'ini (oy boshidan oxirgi sanagacha) yuklang.</p></div></div><RepUpload /></> : <DailyUpload />}
     </div>
   )
 }
 
 function DailyUpload() {
-  const { reload } = useAuth()
+  const { reload, can } = useAuth()
+  const [ask, setAsk] = useState(null)
+  const delJob = async () => {
+    const j = ask; setAsk(null)
+    try { const r = await api.del(`/uploads/jobs/${j.id}`); toast(r.snapshot_removed ? `#${j.id} va ${dmy(j.snap_date)} dinamikasi o'chirildi` : `#${j.id} o'chirildi`); poll(); reload() }
+    catch (e) { toast(e.message, 'err') }
+  }
   const toast = useToast()
   const [area, setArea] = useState(null)
   const [details, setDetails] = useState(null)
@@ -175,7 +194,10 @@ function DailyUpload() {
         {(area || details) && !(area && details) && <div className="hint warn-hint">Eslatma: dinamika to'g'ri bo'lishi uchun ikkala faylni birga yuklash tavsiya etiladi.</div>}
       </div>
       <h3 className="sec-title">Yuklashlar tarixi</h3>
-      <div className="jobs">{jobs.length === 0 ? <div className="card pad mut">Hali yuklash bo'lmagan.</div> : jobs.map((j) => <JobCard key={j.id} j={j} />)}</div>
+      <div className="jobs">{jobs.length === 0 ? <div className="card pad mut">Hali yuklash bo'lmagan.</div> : jobs.map((j) => <JobCard key={j.id} j={j} onDelete={can('data.delete') ? setAsk : null} />)}</div>
+      {ask && <Confirm icon={Trash2} danger title="Yuklashni o'chirish" ok="Ha, o'chirish" onOk={delJob} onCancel={() => setAsk(null)}>
+        <b>#{ask.id}</b> ({dmy(ask.snap_date)}) yuklash yozuvi va serverdagi fayllari o'chiriladi{ask.status === 'done' ? <>, shuningdek <b>{dmy(ask.snap_date)}</b> sanasining dinamika ma'lumoti ham (agar shu sana uchun boshqa yuklash bo'lmasa)</> : ''}.
+        <small className="hint">Hozirgi hisoblagich va TP ro'yxatlari o'zgarmaydi — ular keyingi yuklash bilan yangilanadi. Qaytarib bo'lmaydi.</small></Confirm>}
     </>
   )
 }

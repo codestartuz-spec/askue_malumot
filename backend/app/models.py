@@ -167,6 +167,8 @@ class TgChat(Base):
     username: Mapped[str | None] = mapped_column(String(100), nullable=True)
     source: Mapped[str] = mapped_column(String(10), default="auto")  # auto / manual
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    members: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    members_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 

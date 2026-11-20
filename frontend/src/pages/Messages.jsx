@@ -4,6 +4,7 @@ import { Send, ScrollText, FileText, Image as ImageIcon, CheckCircle2, AlertTria
 import { api, qs } from '../api'
 import { Empty, Modal, Pager, Spinner, useToast } from '../ui'
 import { dt } from '../fmt'
+import { useAuth } from '../auth'
 import Compose from './Compose'
 
 const KIND = { xabar: { label: 'Xabar', icon: Send, cls: 'blue' }, hisobot: { label: 'Kunlik hisobot', icon: Table2, cls: 'green' }, respublika: { label: 'Respublika', icon: Globe2, cls: 'amber' } }
@@ -84,21 +85,23 @@ function Journal() {
 
 export default function Messages() {
   const [sp, setSp] = useSearchParams()
-  const tab = sp.get('t') === 'jurnal' ? 'jurnal' : 'yangi'
+  const { can } = useAuth()
+  const cm = can('telegram.message'), cj = can('telegram.journal')
+  const tab = (sp.get('t') === 'jurnal' && cj) || !cm ? 'jurnal' : 'yangi'
   const [chats, setChats] = useState(null)
   useEffect(() => { api.get('/telegram/chats').then(setChats).catch(() => setChats([])) }, [])
-  const TABS = [{ k: 'yangi', label: 'Yangi xabar', icon: Send }, { k: 'jurnal', label: 'Yuborilganlar jurnali', icon: ScrollText }]
+  const TABS = [cm && { k: 'yangi', label: 'Yangi xabar', icon: Send }, cj && { k: 'jurnal', label: 'Yuborilganlar jurnali', icon: ScrollText }].filter(Boolean)
   return (
     <div className="settings msgs">
       <div className="card head-card">
         <div className="titles"><h2 className="ttl">Xabar yuborish</h2>
           <p className="sub">Telegram kanal va guruhlarga xabar, rasm va video yuboring. Har bir yuborilgan xabar jurnalga yoziladi — kim, qachon va kimlar «Tanishdim» tugmasini bosgani ko'rinadi.</p></div>
       </div>
-      <div className="tabs" role="tablist">
+      {TABS.length > 1 && <div className="tabs" role="tablist">
         {TABS.map((t) => (
           <button key={t.k} role="tab" aria-selected={t.k === tab} className={`tab ${t.k === tab ? 'on' : ''}`} onClick={() => setSp({ t: t.k }, { replace: true })}>
             <t.icon size={18} /><span>{t.label}</span></button>))}
-      </div>
+      </div>}
       {tab === 'jurnal' ? <Journal /> : chats ? <Compose chats={chats} onSent={() => {}} /> : <Spinner />}
     </div>
   )

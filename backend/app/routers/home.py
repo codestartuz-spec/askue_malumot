@@ -45,7 +45,7 @@ def republic(_: User = Depends(need("republic.view")), db: Session = Depends(get
     reps = list(db.scalars(select(RepublicReport).order_by(RepublicReport.end_date.desc()).limit(DAYS)))
     out = []
     for i, r in enumerate(reversed(reps)):
-        latest = r is reps[0]
+        latest = r is reps[0] or (len(reps) > 1 and r is reps[1])
         pages = []
         for p in r.data.get("pages", []):
             pg = {"n": p["n"], "title": p.get("title", ""),

@@ -117,13 +117,16 @@ const cellOf = (rep, n, i) => rep.pages.find((p) => p.n === n)?.cells[i]
 function Republic() {
   const [d, setD] = useState(null)
   const [err, setErr] = useState('')
+  const [mode, setMode] = useState('oy')
   useEffect(() => { api.get('/home/republic').then(setD).catch((e) => setErr(e.message)) }, [])
   if (err) return <div className="card pad"><Empty icon={Globe2}>{err}</Empty></div>
   if (!d) return <Spinner />
   const reps = d.reports
   if (!reps.length) return <div className="card pad"><Empty icon={Globe2}>Respublika PDF'i hali yuklanmagan. «Ma'lumot yuklash» → «Respublika dinamikasi» bo'limidan yuklang.</Empty></div>
   const last = reps[reps.length - 1]
-  const dates = [...new Set(reps.flatMap((r) => [r.start, r.end]).filter(Boolean))].sort()
+  const prev = reps.length > 1 ? reps[reps.length - 2] : null
+  const kun = mode === 'kunlik' && !!prev
+  const dates = [...new Set(reps.flatMap((r) => (kun ? [r.end] : [r.start, r.end])).filter(Boolean))].sort()
   const labels = dates.map(dm)
   // har bir hisobotdan ikki nuqta: oy boshi (qiymat − dinamika) va oxirgi sana
   const line = (n, i) => {
@@ -132,21 +135,27 @@ function Republic() {
       const c = cellOf(r, n, i)
       if (!c || c.v === null || c.v === undefined) return
       v[r.end] = c.v
-      if (r.start && v[r.start] === null && c.d !== null && c.d !== undefined) v[r.start] = c.v - c.d
+      if (!kun && r.start && v[r.start] === null && c.d !== null && c.d !== undefined) v[r.start] = c.v - c.d
     })
     return dates.map((x) => v[x])
   }
   const val = (n, i) => cellOf(last, n, i)
-  const kp = (icon, label, n, i, bad, tone, sub) => { const c = val(n, i); return c ? <Kpi icon={icon} label={label} value={c.v || 0} d={c.d} bad={bad} tone={tone} sub={sub} /> : null }
+  const dOf = (n, i) => { const c = val(n, i), q = prev && cellOf(prev, n, i); return kun ? (c && q && c.v != null && q.v != null ? c.v - q.v : null) : c?.d }
+  const kp = (icon, label, n, i, bad, tone, sub) => { const c = val(n, i); return c ? <Kpi icon={icon} label={label} value={c.v || 0} d={dOf(n, i)} bad={bad} tone={tone} sub={sub} /> : null }
   const pg = (n) => last.pages.find((p) => p.n === n)
-  const rowsOf = (n, i, o = {}) => (pg(n)?.rows || []).map((r) => ({ name: r.name, value: r.cells[i]?.v || 0, sub: r.cells[i]?.d ? ` ${r.cells[i].d > 0 ? '+' : '−'}${num(Math.abs(r.cells[i].d))}` : '' }))
+  const prevRow = (n, name) => prev?.pages.find((p) => p.n === n)?.rows?.find((r) => r.name === name)
+  const rowsOf = (n, i) => (pg(n)?.rows || []).map((r) => {
+    const d = kun ? (prevRow(n, r.name)?.cells[i]?.v != null && r.cells[i]?.v != null ? r.cells[i].v - prevRow(n, r.name).cells[i].v : null) : r.cells[i]?.d
+    return { name: r.name, value: r.cells[i]?.v || 0, sub: d ? ` ${d > 0 ? '+' : '−'}${num(Math.abs(d))}` : '' }
+  })
   const sortDesc = (a) => [...a].sort((p, q) => q.value - p.value)
   const obxPct = (pg(6)?.rows || []).map((r) => ({ name: r.name, value: parseFloat((r.cells[2]?.p || '0').replace(',', '.')) || 0 })).filter((r) => r.value > 0).sort((a, b) => a.value - b.value)
   const j = (n, i) => val(n, i)?.v || 0
   const p2pct = val(2, 2)?.p
   return (
     <>
-      <div className="home-bar"><CalendarDays size={16} />Respublika dinamikasi: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><span className="mut">{reps.length} ta PDF yuklangan • ↑↓ oy boshidan</span></div>
+      <div className="home-bar"><CalendarDays size={16} />Respublika dinamikasi: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><div className="seg"><button className={mode === 'oy' ? 'on' : ''} onClick={() => setMode('oy')}>Oy boshidan</button><button className={mode === 'kunlik' ? 'on' : ''} onClick={() => setMode('kunlik')} title="Oxirgi ikki PDF farqi">Kunlik</button></div>
+        <span className="mut">{reps.length} ta PDF • ↑↓ {kun ? `${dmy(prev.end)} ga nisbatan` : mode === 'kunlik' ? 'kunlik uchun 2-PDF kerak' : 'oy boshidan'}</span></div>
       <div className="kpis">
         {kp(Server, 'Dasturdagi TP / konsentratorlar', 1, 0, false, 'blue')}
         {kp(Layers, 'CAS ga yuklangan', 1, 1, false, 'cyan')}
@@ -159,7 +168,7 @@ function Republic() {
       </div>
 
       <div className="grid2">
-        <Card icon={TrendingUp} title="Online konsentratorlar" sub="oy boshidan"><LineChart labels={labels} series={[{ name: 'Online', color: '#16a34a', values: line(1, 2) }]} /></Card>
+        <Card icon={TrendingUp} title="Online konsentratorlar" sub={kun ? 'kunlik' : 'oy boshidan'}><LineChart labels={labels} series={[{ name: 'Online', color: '#16a34a', values: line(1, 2) }]} /></Card>
         <Card icon={TrendingUp} title="Offline konsentratorlar"><LineChart labels={labels} zero series={[{ name: 'Offline (jami)', color: '#e31e24', values: line(1, 3) }, { name: '3 kundan ortiq', color: '#f59e0b', values: line(1, 4) }]} /></Card>
         <Card icon={TrendingUp} title="Aloqadan chiqib ketgan hisoblagichlar"><LineChart labels={labels} series={[{ name: 'Jami', color: '#e31e24', values: line(2, 1) }]} /></Card>
         <Card icon={TrendingUp} title="Tarmoqdan uzilgan hisoblagichlar"><LineChart labels={labels} series={[{ name: 'Jami', color: '#f59e0b', values: line(3, 1) }]} /></Card>

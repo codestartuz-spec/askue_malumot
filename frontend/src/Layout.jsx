@@ -14,12 +14,12 @@ const NAV = [
   { to: '/respublika', icon: Globe2, label: 'Respublika dinamikasi', perm: 'republic.view' },
   { to: '/xarita', icon: MapPinned, label: 'Xarita', perm: 'map.view' },
   { group: 'Boshqaruv' },
-  { to: '/xabarlar', icon: Send, label: 'Xabar yuborish', perm: 'telegram.send' },
+  { to: '/xabarlar', icon: Send, label: 'Xabar yuborish', any: ['telegram.message', 'telegram.journal'] },
   { to: '/brigadalar', icon: HardHat, label: 'Brigadalar', perm: 'brigade.view' },
-  { to: '/yuklash', icon: UploadCloud, label: "Ma'lumot yuklash", perm: 'data.upload' },
+  { to: '/yuklash', icon: UploadCloud, label: "Ma'lumot yuklash", any: ['data.upload', 'republic.upload'] },
   { to: '/sozlamalar', icon: Cog, label: 'Sozlamalar', any: ['settings.manage', 'system.view', 'backup.manage'] },
   { to: '/xodimlar', icon: Users, label: 'Xodimlar va ruxsatlar', sadmin: true },
-  { to: '/jurnal', icon: ScrollText, label: 'Harakatlar jurnali', sadmin: true },
+  { to: '/jurnal', icon: ScrollText, label: 'Harakatlar jurnali', perm: 'audit.view' },
 ]
 
 function ProfileModal({ onClose }) {

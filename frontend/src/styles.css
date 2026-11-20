@@ -577,3 +577,169 @@ a.pin-btn{display:inline-flex;align-items:center;justify-content:center;color:in
 .pi-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.pi-h .ml{margin-left:auto}.pi-err{color:#c8141a;font-size:12.5px;margin-top:6px}
 .post-item .slim{margin-top:10px}.post-item .sm{margin-top:6px;font-size:12.5px}
 .msgs .compose{margin-top:0}
+
+/* =====================================================================
+   v3 — YANGI DIZAYN: yorug' ish maydoni, toza kartalar, ixcham tablar
+   ===================================================================== */
+:root{
+  --bg:#eef2f8; --line:#dde5f0; --card:#fff; --ink:#0f1b2d; --mut:#5f6f86;
+  --r:14px; --shadow:0 1px 2px rgba(15,35,70,.06),0 8px 24px rgba(15,35,70,.06);
+  --brand:#1d6fff;
+}
+html,body{background:var(--bg)}
+.energy-bg,canvas.energy-bg{display:none!important}
+.boot{color:#33425b}
+
+/* yon panel: ixcham, to'q ko'k */
+.side{background:linear-gradient(180deg,#0a1d3b,#08162d);backdrop-filter:none;border-right:0;box-shadow:2px 0 18px rgba(8,22,45,.18)}
+.side-brand{border-bottom:1px solid rgba(255,255,255,.08)}
+.nav-item{color:#b9cbe8;padding:10px 12px;border-radius:10px}
+.nav-item:hover{background:rgba(255,255,255,.07);transform:none}
+.nav-item.active{background:#1d6fff;color:#fff;box-shadow:0 6px 16px rgba(29,111,255,.4)}
+.nav-item.active::before{display:none}
+.nav-item.active svg{color:#fff;opacity:1}
+.nav-group{color:#6f86ad}
+.side-foot{border-top:1px solid rgba(255,255,255,.08)}
+
+/* yuqori panel */
+.top{background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);color:var(--ink);padding:11px 24px}
+.top-title{font-size:19px;color:#0b1a33}
+.top .chip{background:#eef5ff;border:1px solid #cfe0fb;color:#1c4d9c}
+.user:hover{background:#f1f5fb;border-color:var(--line)}
+.user-name small{color:#6b7c95}
+.avatar{box-shadow:none}
+.user-menu{background:#fff;border:1px solid var(--line);box-shadow:0 14px 34px rgba(15,35,70,.18)}
+.user-menu button{color:#1b2f52}.user-menu button:hover{background:#eef4ff}
+.top .icon-btn:hover{background:#eef2f9}
+.content{padding:22px 24px 44px;max-width:1700px}
+.content.content-map{max-width:none;padding:0}
+
+/* kartalar */
+.card{box-shadow:var(--shadow);border:1px solid #e4ebf5;animation:none}
+.card::before{height:0;background:none;animation:none}
+.head-card{padding:18px 22px;border-left:4px solid var(--brand)}
+.head-card .titles{text-align:left}
+.ttl{font-size:20px;color:#0b1a33}
+.sub{color:var(--mut);max-width:900px}
+.dinamika{color:#d8232a;animation:none;font-size:15px;letter-spacing:.3em;margin-top:6px}
+.sec-title{color:#1b2f52;font-size:15px;font-weight:800;margin:24px 2px 10px}
+.mp-sec{color:#1b2f52}
+
+/* tablar: yengil segment */
+.tabs{background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:14px;padding:5px;gap:4px}
+.tab{color:#51627c;padding:10px 16px;border-radius:10px;font-weight:700}
+.tab:hover{background:#f0f5fd;color:#143a78}
+.tab.on{background:var(--brand);color:#fff;box-shadow:0 6px 16px rgba(29,111,255,.35);animation:none}
+.tab.on svg{color:#fff;filter:none}
+.tabs.scroll .tab{flex:0 0 auto}
+
+/* jadvallar */
+.dyn-table tbody tr{animation:none}
+.dyn-table tr.total td{background:#fff2c2}
+.list th{background:#f1f5fb;color:#3a4c6b}
+
+/* tugmalar */
+.btn.primary{background:var(--brand);box-shadow:0 4px 12px rgba(29,111,255,.3)}
+.btn.primary:hover:not(:disabled){box-shadow:0 6px 16px rgba(29,111,255,.42)}
+.btn.ghost{border-color:#cdd8ea}
+.btn.danger{background:#dc2626;box-shadow:0 4px 12px rgba(220,38,38,.28)}
+.btn.ghost.del{color:#b91c1c;border-color:#f0c4c4}.btn.ghost.del:hover:not(:disabled){background:#fef2f2;border-color:#e08a8a}
+
+/* sahifa tepasidagi "dinamika turi" segmenti */
+.seg{display:inline-flex;background:#eef2f8;border:1px solid #d6e0ee;border-radius:11px;padding:3px;gap:2px}
+.seg button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#4a5c78;padding:7px 14px;border-radius:8px;font-weight:700;font-size:13.5px}
+.seg button:hover{color:#143a78}
+.seg button.on{background:#fff;color:var(--brand);box-shadow:0 1px 4px rgba(15,35,70,.18)}
+
+/* progress: holatga qarab rang */
+.progress{height:18px;background:#e6edf7}
+.progress.st-queued .bar{background:repeating-linear-gradient(135deg,#f59e0b 0 12px,#fbbf24 12px 24px);box-shadow:0 0 10px rgba(245,158,11,.5)}
+.progress.st-running .bar{background:repeating-linear-gradient(135deg,#1d6fff 0 12px,#3d8bff 12px 24px)}
+.progress.st-done .bar{background:#16a34a;animation:none;box-shadow:none}
+.progress.st-error .bar{background:#dc2626;animation:none;box-shadow:none}
+.job{border:1px solid #e4ebf5;border-left-width:5px}
+.job.running{background:linear-gradient(90deg,#f3f8ff,#fff 40%)}
+.job.queued{background:linear-gradient(90deg,#fff9ec,#fff 40%)}
+.job.error{background:linear-gradient(90deg,#fff4f4,#fff 40%)}
+.job-top .icon-btn{margin-left:2px}
+.lnk{background:none;border:0;color:var(--brand);font-weight:700;font-size:12.5px;padding:2px 4px;display:inline-flex;align-items:center;gap:4px}
+.lnk:hover{text-decoration:underline}
+.acts{white-space:nowrap}.acts .btn{margin-right:6px}
+
+/* ---------- xodimlar kartochkalari ---------- */
+.usr-stats{display:flex;gap:8px;flex-wrap:wrap}
+.us{display:inline-flex;align-items:center;gap:7px;border:1.5px solid #d6e0ee;background:#fff;border-radius:11px;padding:7px 13px;font-weight:700;color:#3b4d6c}
+.us b{font-size:15px;color:#0b1a33}
+.us.on{border-color:var(--brand);background:#eef5ff;color:#143a78}
+.us.green.on{border-color:#16a34a;background:#effbf3}.us.red.on{border-color:#dc2626;background:#fef3f3}
+.usr-search{margin:0;min-width:260px}
+.ucards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+.ucard{background:#fff;border:1px solid #e1e9f4;border-radius:16px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px;transition:box-shadow .2s,transform .2s}
+.ucard:hover{box-shadow:0 10px 28px rgba(15,35,70,.12);transform:translateY(-2px)}
+.ucard.off{background:#fafbfd}.ucard.off .uc-av{filter:grayscale(.7);opacity:.7}
+.ucard.super{border-color:#f3d98a;background:linear-gradient(180deg,#fffaf0,#fff 45%)}
+.uc-top{display:flex;align-items:center;gap:12px}
+.uc-av{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex:none;
+  background:linear-gradient(135deg,hsl(var(--h) 70% 48%),hsl(calc(var(--h) + 40) 70% 40%))}
+.uc-id{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.uc-id b{font-size:15.5px;color:#0b1a33;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uc-id span{color:#6b7c95;font-size:13px;display:flex;align-items:center;gap:4px}
+.crown{color:#d99a00}
+.uc-info{display:grid;gap:5px;font-size:13px;color:#33425b;padding:10px 12px;background:#f5f8fd;border-radius:11px}
+.uc-info div{display:flex;align-items:center;gap:8px}.uc-info svg{color:#7a8ca8;flex:none}.uc-info em{color:#97a3b6;font-style:normal}
+.uc-perms{flex:1}
+.uc-ph{display:flex;align-items:center;gap:7px;color:#143a78;margin-bottom:6px}.uc-ph .lnk{margin-left:auto}
+.uc-groups{display:flex;flex-direction:column;gap:6px}
+.ucg{display:flex;flex-direction:column;gap:3px}.ucg-t{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:#7a8ca8;font-weight:700;display:flex;align-items:center;gap:6px}
+.ucg .tags{display:flex;flex-wrap:wrap;gap:5px}
+.ucg:not(:has(.tag:not(.blue))) {flex-direction:row;align-items:center;justify-content:space-between}
+.uc-acts{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid #edf1f8;padding-top:12px}
+.uc-acts .del{margin-left:auto}
+.perm-count{margin-left:auto;background:#eaf2ff;color:#1d4ed8;border-radius:99px;padding:2px 10px;font-size:12px}
+.perm-title{display:flex}
+.presets{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:6px 0 12px}
+.presets>span{display:flex;align-items:center;gap:5px;color:#5f6f86;font-weight:700;font-size:13px}
+.presets .chip{padding:5px 12px;font-size:12.5px;display:inline-flex;align-items:center;gap:4px}
+.presets .chip.danger{border-color:#f1c5c5;color:#b91c1c}
+.perm-acc{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;padding-right:4px}
+.pa{border:1px solid #dbe6f7;border-radius:12px;background:#f8fbff;overflow:hidden}
+.pa.has{border-color:#b9d1f7}
+.pa-h{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:11px 14px;text-align:left;color:#143a78}
+.pa-h b{flex:1}
+.pa-n{font-size:12px;font-weight:800;background:#e8eef8;color:#5f6f86;border-radius:99px;padding:2px 10px}
+.pa-n.some{background:#fff1cc;color:#8a5a00}.pa-n.all{background:#dcf7e5;color:#166534}
+.pa-ch{transition:transform .2s;color:#6b7c95}.pa.open .pa-ch{transform:rotate(180deg)}
+.pa-b{padding:2px 14px 12px;border-top:1px dashed #d5e1f3}
+.pa-tools{display:flex;gap:14px;padding:8px 0 4px}.pa-tools button{background:none;border:0;color:var(--brand);font-weight:700;font-size:12.5px;padding:0}
+.pa-tools button:hover{text-decoration:underline}
+
+/* ---------- xarita paneli: tab menyu ---------- */
+.map-panel{padding:0;display:flex;flex-direction:column;overflow:hidden;border-radius:16px;background:#fff;width:340px}
+.map-panel .mp-title{padding:14px 16px 8px;margin:0}
+.map-panel .searchbar.sm{margin:0 16px 10px}
+.map-panel .found{margin:0 16px 8px}
+.mp-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:0 16px 10px;background:#eef2f8;border-radius:11px;padding:3px}
+.mp-tabs button{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;border-radius:8px;padding:8px 4px;font-weight:700;font-size:13px;color:#4a5c78}
+.mp-tabs button.on{background:#fff;color:var(--brand);box-shadow:0 1px 4px rgba(15,35,70,.2)}
+.mp-tabs .dot{position:absolute;top:5px;right:7px;width:7px;height:7px;border-radius:50%;background:#f59e0b}
+.mp-body{padding:4px 16px 8px;overflow:auto;flex:1}
+.map-panel .mp-chip{margin:0 16px 8px}
+.map-panel .field{margin-bottom:12px}
+.mp-active{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:9px 16px;border-top:1px solid #e6edf7;background:#f8fbff}
+.mp-active .chip{padding:3px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:default;box-shadow:none}
+.mp-active .chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.mp-active .lnk{margin-left:auto}
+.map-panel .mp-info{margin:0;padding:10px 16px 12px;border-top:1px solid #e6edf7}
+.sel-dot{position:relative}
+.sel-dot i{position:absolute;left:12px;top:50%;width:11px;height:11px;border-radius:50%;transform:translateY(-50%);pointer-events:none;box-shadow:0 0 0 2px #fff,0 0 0 3px #d6e0ee}
+.sel-dot select{width:100%;padding-left:32px}
+@media(max-width:900px){.map-panel{width:100%}}
+.map-panel{bottom:auto;max-height:calc(100% - 82px)}
+.home-strip,.home .strip{background:#fff!important;color:#1b2f52!important;border:1px solid var(--line)}
+.list td.nowrap-d{white-space:nowrap}
+.home-bar{background:#fff;border:1px solid var(--line);color:#33425b;box-shadow:var(--shadow)}
+.home-bar svg{color:#d99a00}.home-bar b{color:#0b1a33}.home-bar .mut{color:#6b7c95}
+.members{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border-radius:99px;background:#eaf2ff;color:#1d4ed8;font-size:12px;font-weight:700;vertical-align:1px}
+/* ruxsatlar muharriri: qisilib qolmasin, modal o'zi aylantirilsin */
+.perm-acc{max-height:none!important;overflow:visible!important}
+.pa{flex:none}
