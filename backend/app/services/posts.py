@@ -4,23 +4,22 @@ from datetime import datetime
 
 from sqlalchemy import text
 
-from ..db import engine
+from ..db import engine, insert_id
 
 
 def create_post(kind: str, title: str, body: str, files: list[str], ack: bool, by: str,
                 chats: list[tuple[str, str]]) -> tuple[int, dict[str, int]]:
     """Post va har bir kanal uchun element yaratadi. Qaytaradi: (post_id, {chat_id: item_id})."""
     with engine.begin() as c:
-        c.execute(text("INSERT INTO tg_posts (kind,title,body,files,ack,created_by,created_at) "
-                       "VALUES (:k,:t,:b,:f,:a,:u,:n)"),
-                  {"k": kind, "t": title[:250], "b": body, "f": json.dumps(files, ensure_ascii=False), "a": ack,
-                   "u": by, "n": datetime.now()})
-        pid = c.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        pid = insert_id(c, "INSERT INTO tg_posts (kind,title,body,files,ack,created_by,created_at) "
+                           "VALUES (:k,:t,:b,:f,:a,:u,:n)",
+                        {"k": kind, "t": title[:250], "b": body, "f": json.dumps(files, ensure_ascii=False), "a": ack,
+                         "u": by, "n": datetime.now()})
         items = {}
         for chat_id, ttl in chats:
-            c.execute(text("INSERT INTO tg_post_items (post_id,chat_id,chat_title,status,error) VALUES (:p,:c,:t,'wait','')"),
-                      {"p": pid, "c": str(chat_id), "t": ttl[:200]})
-            items[str(chat_id)] = c.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+            items[str(chat_id)] = insert_id(
+                c, "INSERT INTO tg_post_items (post_id,chat_id,chat_title,status,error) VALUES (:p,:c,:t,'wait','')",
+                {"p": pid, "c": str(chat_id), "t": ttl[:200]})
     return pid, items
 
 

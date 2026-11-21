@@ -114,3 +114,46 @@ frontend/  React: src/pages, src/tables.js (jadval tuzilmasi), dist/ (tayyor bui
 - Sozlamalar: «Tizim va server holati» va «Zaxira nusxa» (har kuni 01:00, sadminga Telegram orqali; worker ishlashi shart). Tiklash: gunzip -c fayl.sql.gz | mysql -u root -p askue
 - Ruxsatlar qayta tuzildi (yangi: republic.view, system.view, backup.manage; bog'liq ruxsatlar avtomatik).
 - Yangi kutubxonalar: pdfplumber, psutil — setup.bat qayta ishga tushiring.
+
+
+## Xavfsizlik, Redis va sifat (v10)
+
+**Redis.** Docker'da avtomatik (`redis` xizmati, parol `.env` dagi `REDIS_PASSWORD`). U ishlatiladi: login urinishlarini cheklash
+(login+IP, IP va login bo'yicha, bosqichma-bosqich 1→5→15→60 daqiqa bloklash), Telegramga yuborish navbati (worker ishonchli
+oladi, yiqilsa qayta navbatga qaytadi), yetakchi qulf (bot polling / zaxira jadvali faqat bitta nusxada), sozlamalar keshi.
+`REDIS_URL` bo'sh bo'lsa (Windows `start.bat`) xotira rejimi ishlaydi — bitta jarayon uchun yetarli, shuning uchun `start.bat` 1 ta
+worker bilan ishga tushadi. Production'da (`ENV=production`) Redis'siz yoki `SECRET_KEY`siz ishga tushmaydi.
+
+**Mijoz IP si.** `CF-Connecting-IP` / `X-Forwarded-For` ga faqat `TRUSTED_PROXIES` (standart: loopback va Docker tarmoqlari)
+dagi proksidan kelgan so'rovlarda ishoniladi. Uvicorn'ning `--proxy-headers` rejimi o'chirilgan.
+
+**Qurilma identifikatori.** Server imzolagan HttpOnly cookie (`askue_did`) + eski localStorage UUID (o'tish uchun). Cookie va
+storage tozalansa ham, bloklangan qurilma bilan IP+User-Agent mos kelsa, baribir bloklangan hisoblanadi.
+
+**PDF yuklash.** Kengaytma, hajm (`MAX_PDF_MB`), `%PDF-`/`%%EOF`, parol, JavaScript/Launch/EmbeddedFile va boshqa faol kontent
+(`#xx` bilan yashirilganlari ham) tekshiriladi; o'qish alohida jarayonda, vaqt (`PDF_PARSE_TIMEOUT`) va xotira chegarasi bilan.
+Area/Details: yuklash hajmi (`MAX_UPLOAD_MB`), `.gz` belgisi va ochilgandan keyingi hajm (`MAX_UNZIPPED_MB`, gzip-bomba) cheklangan;
+o'qish oqim bilan, 4000 qatorlik bo'laklarda.
+
+**Shifrlash.** Zaxira nusxalar `*.sql.gz.enc` (Fernet, kalit — `BACKUP_KEY`, bo'sh bo'lsa `SECRET_KEY`dan). Telegram tokeni bazada
+shifrlangan (`enc1:`). Zaxirani ochish: `python -m app.tools.decrypt_backup fayl.sql.gz.enc`. **Kalitni yo'qotmang** — usiz ochib bo'lmaydi.
+
+**Migratsiyalar.** Alembic (`backend/app/migrations`), ishga tushganda avtomatik (`MySQL GET_LOCK` bilan, API va worker bir vaqtda
+ishlasa ham xavfsiz). Eski bazalar ham bir xil yo'l bilan yangilanadi. Yangi o'zgarish: `app/migrations/versions/` ga yangi fayl
+(`add_column`/`add_index` yordamchilari qayta bajarilsa ham xavfsiz).
+
+**MySQL 8.** Har ulanishda MySQL 8 `sql_mode` (ONLY_FULL_GROUP_BY, STRICT) o'rnatiladi, shuning uchun MariaDB'da ham xuddi shu
+qoidalar bilan sinaladi. CI (`.github/workflows/ci.yml`) testlarni ham `mysql:8.0`, ham `mariadb` da yuritadi.
+
+**Sozlamalar.** Hudud nomi, AG sarlavhasi/hududi/boshlang'ich sanasi — Sozlamalar → «Umumiy sozlamalar» (kodda qattiq yozilmagan).
+Ruxsatlar va tayyor to'plamlar (presetlar) faqat `backend/app/perms.py` da; frontend ularni `/api/meta/bootstrap` dan oladi.
+
+**Audit jurnali.** Qidiruv, foydalanuvchi/amal/IP/sana filtrlari, CSV va Excel eksport (formula in'ektsiyasidan himoyalangan),
+`AUDIT_KEEP_DAYS` (standart 365) dan eskilari kuniga bir marta tozalanadi.
+
+**Testlar.** `cd backend && pip install -r requirements-dev.txt && python -m pytest` (alohida `askue_test` bazasi kerak:
+`TEST_DATABASE_URL`; Redis testlari uchun `redis-server` bo'lsa yoki `TEST_REDIS_URL`). Testlar ruxsatlar (har bir route),
+login/IP/qurilma, PDF, shifrlash, Redis/navbat, migratsiya, audit va yuborish jarayonini qamraydi.
+
+**Bog'liqliklar.** `requirements.txt` va `package.json` aniq versiyalarga qulflangan; Dependabot haftalik PR ochadi; CI'da
+`pip-audit` va `npm audit` bor.

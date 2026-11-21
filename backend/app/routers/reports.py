@@ -1,7 +1,5 @@
 import re
-import threading
 import time
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -9,7 +7,11 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import SessionLocal, engine, get_db
+from ..services import sendjobs
+from ..settings_store import app_cfg
+from ..tasks import submit, task
 from ..deps import has_perm, log, need
 from ..models import User
 from ..services import reports as R
@@ -18,7 +20,6 @@ from ..services.dyn import compute
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
-REGION = "Qashqadaryo hududiy filiali"
 VIEW = {"konsentrator": "view.konsentrator", "aloqa": "view.aloqa", "obxod": "view.obxod"}
 MIME = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
@@ -42,7 +43,7 @@ def make_report(db: Session, kind: str, esp_id: int | None, fmt: str, df: str | 
             raise HTTPException(404, "Tuman topilmadi")
         scope, first = row[0], "Brigada"
     else:
-        esp_id, scope, first = None, REGION, "Hudud nomi"
+        esp_id, scope, first = None, app_cfg("region_name"), "Hudud nomi"
     items = [(t, compute(db, esp_id, df, dt, can_cmp)) for t in tables]
     if not items[0][1]["rows"]:
         raise HTTPException(400, "Hali ma'lumot yuklanmagan")
@@ -79,10 +80,12 @@ class SendIn(BaseModel):
     date_to: str | None = None
 
 
-def _run_send(job_id: int, items: list[SendItem], chats: list[tuple[str, str]], df, dt, tables, can_cmp,
+@task("report.send")
+def _run_send(job_id: int, items: list[dict], chats: list[tuple[str, str]], df, dt, tables, can_cmp,
               post_id: int = 0, pitems: dict | None = None, ack: bool = False):
     from ..services import posts as P
     pitems = pitems or {}
+    items = [SendItem(**i) if isinstance(i, dict) else i for i in items]
     chat_err: dict[str, str] = {}
     last_mid: dict[str, int | None] = {}
     lines: list[str] = []
@@ -123,7 +126,7 @@ def _run_send(job_id: int, items: list[SendItem], chats: list[tuple[str, str]], 
                     P.item_done(iid, str(chat_id) not in chat_err, last_mid.get(str(chat_id)), chat_err.get(str(chat_id), ""))
                 done += 1
                 flush()
-                time.sleep(3.2)     # Telegram chegarasi: guruhga daqiqasiga ~20 xabar
+                time.sleep(settings.send_delay_sec)     # Telegram chegarasi: guruhga daqiqasiga ~20 xabar
         for cid, iid in pitems.items():      # fayl yaratib bo'lmagan holat
             with engine.connect() as c:
                 st = c.execute(text("SELECT status FROM tg_post_items WHERE id=:i"), {"i": iid}).scalar()
@@ -145,24 +148,16 @@ def send(body: SendIn, user: User = Depends(need("telegram.send")), db: Session 
         if it.fmt not in MIME or it.kind not in ("region", "district") or (it.kind == "district" and not it.esp_id):
             raise HTTPException(400, "Noto'g'ri tanlov")
     tables = allowed_tables(user)
-    chats = [(r[0], r[1]) for r in db.execute(text("SELECT chat_id, title FROM tg_chats WHERE is_active=1 "
-                                                   "AND id IN :ids").bindparams(
-        __import__("sqlalchemy").bindparam("ids", expanding=True)), {"ids": body.chat_ids})]
-    if not chats:
-        raise HTTPException(400, "Tanlangan kanallar topilmadi")
-    if not db.execute(text("SELECT 1 FROM kv WHERE k='tg_token'")).first():
-        raise HTTPException(400, "Telegram bot sozlanmagan (Sozlamalar bo'limi)")
-    db.execute(text("INSERT INTO send_jobs (status,progress,log,created_by,created_at) VALUES ('running',0,'',:u,:t)"),
-               {"u": user.username, "t": datetime.now()})
-    job_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+    chats = sendjobs.chats_for(db, body.chat_ids)
+    sendjobs.require_bot(db)
+    job_id = sendjobs.create_job(db, user.username)
     log(db, user.username, "telegram_hisobot", f"{len(body.items)} ta fayl → {', '.join(c[1] for c in chats)}")
     db.commit()
     from ..services import posts as P
     pid, pitems = P.create_post("hisobot", f"Kunlik dinamika — {len(body.items)} ta fayl", "", [], body.ack,
                                 user.username, chats)
-    threading.Thread(target=_run_send, daemon=True,
-                     args=(job_id, body.items, chats, body.date_from, body.date_to, tables,
-                           has_perm(user, "dynamics.compare"), pid, pitems, body.ack)).start()
+    submit("report.send", job_id, [i.model_dump() for i in body.items], chats, body.date_from, body.date_to, tables,
+           has_perm(user, "dynamics.compare"), pid, pitems, body.ack)
     return {"id": job_id}
 
 

@@ -32,6 +32,8 @@ prepare_env() {
   setenv MYSQL_ROOT_PASSWORD "$(rand 28)"
   setenv MYSQL_PASSWORD "$(rand 28)"
   setenv SECRET_KEY "$(rand 64)"
+  setenv BACKUP_KEY "$(rand 48)"
+  setenv REDIS_PASSWORD "$(rand 28)"
   if ! grep -qE '^SADMIN_PASSWORD=.+' .env; then
     NEWPASS="$(rand 14)Aa1"; setenv SADMIN_PASSWORD "$NEWPASS"; SHOWPASS="$NEWPASS"
   fi

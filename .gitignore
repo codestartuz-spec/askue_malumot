@@ -7,3 +7,4 @@ frontend/node_modules/
 .env
 backups/
 frontend/dist/
+backend/tests/.data/

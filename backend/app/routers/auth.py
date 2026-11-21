@@ -3,7 +3,7 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,8 +15,8 @@ from ..models import Device, Kv, PwReset, User, UserSession
 from ..services.devices import BLOCKED_MSG, client_ip, touch_device
 from ..services import telegram as tg
 from ..perms import PERM_CODES
-from ..security import (clear_fails, hash_password, make_token, read_token, register_fail, too_many_attempts,
-                        verify_password)
+from .. import throttle
+from ..security import hash_password, make_token, read_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -38,30 +38,35 @@ class PingIn(BaseModel):
 
 
 @router.post("/ping")
-def ping(body: PingIn, request: Request, db: Session = Depends(get_db)):
+def ping(body: PingIn, request: Request, response: Response, db: Session = Depends(get_db)):
     """Ilova ochilganda qurilmani ro'yxatga oladi va bloklanganini bildiradi."""
-    d = touch_device(db, request, body.device_id)
+    d = touch_device(db, request, body.device_id, response=response)
     db.commit()
     bot = db.scalar(select(Kv.v).where(Kv.k == "tg_bot_username")) or ""
-    return {"blocked": d.is_blocked, "message": BLOCKED_MSG if d.is_blocked else "", "bot_username": bot}
+    from ..settings_store import app_cfg
+    return {"blocked": d.is_blocked, "message": BLOCKED_MSG if d.is_blocked else "", "bot_username": bot,
+            "region_name": app_cfg("region_name")}
 
 
 @router.post("/login")
-def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
-    key = f"{request.client.host if request.client else '?'}|{body.username.lower()}"
-    if too_many_attempts(key):
-        raise HTTPException(429, "Urinishlar ko'p. Bir necha daqiqadan keyin qayta urinib ko'ring")
-    dev = touch_device(db, request, body.device_id)
+def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    ip = client_ip(request)
+    wait = throttle.retry_after(body.username, ip)
+    if wait:
+        raise HTTPException(429, f"Urinishlar ko'p. {throttle.fmt_wait(wait)}dan keyin qayta urinib ko'ring",
+                            headers={"Retry-After": str(wait)})
+    dev = touch_device(db, request, body.device_id, response=response)
     if dev.is_blocked:
         db.commit()
         raise HTTPException(403, BLOCKED_MSG)
     u = db.scalar(select(User).where(User.username == body.username.strip()))
     if not u or not u.is_active or not verify_password(body.password, u.password_hash):
-        register_fail(key)
-        log(db, body.username.strip()[:64], "kirish_xato", f"Noto'g'ri login yoki parol • {dev.name}")
+        locked = throttle.register_fail(body.username, ip)
+        log(db, body.username.strip()[:64], "kirish_xato", f"Noto'g'ri login yoki parol • {dev.name}"
+            + (f" • {throttle.fmt_wait(locked)}ga bloklandi" if locked else ""))
         db.commit()
         raise HTTPException(401, "Login yoki parol noto'g'ri")
-    clear_fails(key)
+    throttle.clear(body.username, ip)
     u.last_login = datetime.now()
     dev.last_user = u.username
     # bitta login — bitta qurilma: boshqa faol sessiyalar tugatiladi
@@ -158,10 +163,12 @@ class ForgotIn(BaseModel):
 
 @router.post("/forgot")
 def forgot(body: ForgotIn, request: Request, db: Session = Depends(get_db)):
-    key = f"forgot|{request.client.host if request.client else '?'}"
-    if too_many_attempts(key):
-        raise HTTPException(429, "Urinishlar ko'p. Bir necha daqiqadan keyin qayta urinib ko'ring")
-    register_fail(key)
+    ip = client_ip(request)
+    wait = throttle.retry_after(body.username, ip, "forgot")
+    if wait:
+        raise HTTPException(429, f"Urinishlar ko'p. {throttle.fmt_wait(wait)}dan keyin qayta urinib ko'ring",
+                            headers={"Retry-After": str(wait)})
+    throttle.register_fail(body.username, ip, "forgot")
     u = db.scalar(select(User).where(User.username == body.username.strip().lower()))
     if not u or not u.is_active:
         raise HTTPException(404, "Bunday login topilmadi")
@@ -189,7 +196,12 @@ class ResetIn(BaseModel):
 
 
 @router.post("/reset")
-def reset(body: ResetIn, db: Session = Depends(get_db)):
+def reset(body: ResetIn, request: Request, db: Session = Depends(get_db)):
+    ip = client_ip(request)
+    wait = throttle.retry_after(body.username, ip, "reset")
+    if wait:
+        raise HTTPException(429, f"Urinishlar ko'p. {throttle.fmt_wait(wait)}dan keyin qayta urinib ko'ring",
+                            headers={"Retry-After": str(wait)})
     if len(body.new_password) < 6:
         raise HTTPException(400, "Yangi parol kamida 6 belgidan iborat bo'lsin")
     u = db.scalar(select(User).where(User.username == body.username.strip().lower()))
@@ -197,6 +209,7 @@ def reset(body: ResetIn, db: Session = Depends(get_db)):
     if not u or not r or r.expires < datetime.now() or r.tries >= 5:
         raise HTTPException(400, "Kod eskirgan yoki noto'g'ri. Yangi kod so'rang")
     if not secrets.compare_digest(r.code_hash, _hash_code(body.code.strip(), u.id)):
+        throttle.register_fail(body.username, ip, "reset")
         r.tries += 1
         db.commit()
         raise HTTPException(400, "Kod noto'g'ri")

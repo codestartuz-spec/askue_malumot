@@ -6,15 +6,14 @@ from datetime import datetime
 
 from sqlalchemy import text
 
-from ..db import engine
+from ..db import engine, upsert_kv
 from . import geo, snapshots
 from .ingest import IngestError, ingest_area, ingest_details, remap_meters
 
 
 def set_kv(k: str, v: str) -> None:
     with engine.begin() as c:
-        c.execute(text("INSERT INTO kv (k,v) VALUES (:k,:v) ON DUPLICATE KEY UPDATE v=VALUES(v)"),
-                  {"k": k, "v": v})
+        upsert_kv(c, k, v)
 
 
 def heartbeat_loop() -> None:

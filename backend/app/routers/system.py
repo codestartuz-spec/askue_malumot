@@ -3,7 +3,6 @@ import platform
 import re
 import shutil
 import sys
-import threading
 import time
 from datetime import datetime
 
@@ -199,7 +198,7 @@ def b_download(bid: int, _: User = Depends(need("backup.manage")), db: Session =
     p = B._bdir() / b.filename
     if not p.exists():
         raise HTTPException(404, "Fayl serverda topilmadi")
-    return FileResponse(p, filename=b.filename, media_type="application/gzip")
+    return FileResponse(p, filename=b.filename, media_type="application/octet-stream")
 
 
 @router.post("/backups/{bid}/send")

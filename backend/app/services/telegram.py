@@ -12,7 +12,9 @@ import requests
 from sqlalchemy import text
 
 from ..config import settings
-from ..db import engine
+from ..db import engine, upsert_kv
+from ..store import acquire_lock, OWNER
+from .crypto import decrypt_text
 from ..security import hash_password
 
 
@@ -30,7 +32,7 @@ def _proxies() -> dict | None:
 
 def get_token() -> str:
     with engine.connect() as c:
-        return c.execute(text("SELECT v FROM kv WHERE k='tg_token'")).scalar() or ""
+        return decrypt_text(c.execute(text("SELECT v FROM kv WHERE k='tg_token'")).scalar() or "")
 
 
 def call(method: str, params: dict | None = None, files: dict | None = None,
@@ -279,10 +281,14 @@ def _handle_update(u: dict) -> None:
 
 
 def poll_forever() -> None:
+    """Yangilanishlarni oladi. Bir vaqtda faqat bitta nusxa (yetakchi qulf) — aks holda Telegram 409 xatosini beradi."""
     offset = 0
     last_token = None
     while True:
         try:
+            if not acquire_lock("tg-poll", 90, OWNER):
+                time.sleep(10)
+                continue
             token = get_token()
             if not token:
                 time.sleep(5)
@@ -297,8 +303,7 @@ def poll_forever() -> None:
                                           "allowed_updates": '["message","my_chat_member","channel_post","callback_query"]'},
                            timeout=35, token=token, retries=1)
             with engine.begin() as c:
-                c.execute(text("INSERT INTO kv (k,v) VALUES ('tg_poll_hb',:v) ON DUPLICATE KEY UPDATE v=VALUES(v)"),
-                          {"v": str(int(time.time()))})
+                upsert_kv(c, "tg_poll_hb", str(int(time.time())))
             for u in updates:
                 offset = u["update_id"] + 1
                 try:
@@ -340,11 +345,19 @@ _ref_lock = threading.Lock()
 
 
 def refresh_members_bg(max_age_min: int = 30) -> None:
-    def run():
-        if not _ref_lock.acquire(blocking=False):
-            return
+    """A'zolar sonini fonda yangilaydi (bir vaqtda bitta; Redis bo'lsa — barcha jarayonlar bo'yicha bitta)."""
+    from ..tasks import submit
+    if acquire_lock("refresh-members", 60, OWNER + str(time.time())):
+        submit("tg.refresh_members", max_age_min)
+
+
+from ..tasks import task  # noqa: E402
+
+
+@task("tg.refresh_members")
+def _refresh_task(max_age_min: int = 30) -> None:
+    if _ref_lock.acquire(blocking=False):
         try:
             refresh_members(max_age_min)
         finally:
             _ref_lock.release()
-    threading.Thread(target=run, daemon=True).start()

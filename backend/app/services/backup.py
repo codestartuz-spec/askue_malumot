@@ -13,10 +13,13 @@ from sqlalchemy import select, text
 from ..config import settings
 from ..db import SessionLocal, engine
 from ..models import Backup, User
+from ..db import upsert_kv
+from ..store import OWNER, acquire_lock
 from . import telegram as tg
+from .crypto import encrypt_bytes
 
 TABLES = ["users", "esps", "brigades", "brigade_members", "snapshots", "kv", "tg_chats", "tg_users", "audit",
-          "republic_reports", "backups"]
+          "republic_reports", "ag_reports", "backups"]
 TG_LIMIT = 49 * 1024 * 1024
 _lock = threading.Lock()
 
@@ -79,7 +82,7 @@ def _kv(k: str, default: str = "") -> str:
 
 def _set(k: str, v: str) -> None:
     with engine.begin() as c:
-        c.execute(text("INSERT INTO kv (k,v) VALUES (:k,:v) ON DUPLICATE KEY UPDATE v=VALUES(v)"), {"k": k, "v": v})
+        upsert_kv(c, k, v)
 
 
 def settings_get() -> dict:
@@ -102,10 +105,10 @@ def _bdir():
 def run_backup(kind: str = "auto") -> dict:
     """Zaxira nusxa oladi, faylga saqlaydi va sadminga Telegram orqali yuboradi."""
     with _lock:
-        name = f"askue_zaxira_{datetime.now():%Y-%m-%d_%H%M}.sql.gz"
+        name = f"askue_zaxira_{datetime.now():%Y-%m-%d_%H%M}.sql.gz.enc"
         rec = Backup(kind=kind, filename=name)
         try:
-            blob = make_dump()
+            blob = encrypt_bytes(make_dump())
             (_bdir() / name).write_bytes(blob)
             rec.size, rec.status = len(blob), "ok"
         except Exception as e:  # noqa: BLE001
@@ -158,6 +161,9 @@ def cleanup() -> None:
 def _loop() -> None:
     while True:
         try:
+            if not acquire_lock("backup-sched", 90, OWNER):
+                time.sleep(30)
+                continue
             cfg = settings_get()
             now = datetime.now()
             today = now.strftime("%Y-%m-%d")
@@ -165,6 +171,12 @@ def _loop() -> None:
                 _set("backup_last_auto", today)     # avval belgilaymiz — bir kunda ikki marta ishlamasligi uchun
                 print(f"Zaxira nusxa olinmoqda ({today})", flush=True)
                 run_backup("auto")
+            if _kv("audit_purged", "") != today:          # kuniga bir marta: eski audit yozuvlarini tozalash
+                _set("audit_purged", today)
+                from ..routers.audit import purge_old
+                n = purge_old()
+                if n:
+                    print(f"Audit jurnalidan {n} ta eski yozuv o'chirildi", flush=True)
         except Exception:  # noqa: BLE001
             traceback.print_exc()
         time.sleep(30)

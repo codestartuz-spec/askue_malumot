@@ -15,12 +15,16 @@ PERMS = [
      "Brigadalar, ularning xodimlari va TP'larini ko'radi", None),
     ("republic.view", "Jadvallar va sahifalar", "Respublika dinamikasi sahifasi",
      "Viloyat bo'yicha respublika dinamikasini ko'radi va kunma-kun solishtiradi", None),
+    ("ag.view", "Jadvallar va sahifalar", "AG dinamikasi sahifasi",
+     "Aloqadan chiqib ketgan hisoblagichlar va hodisalar (AG) dinamikasini ko'radi va solishtiradi", None),
     ("data.upload", "Ma'lumot yuklash", "Kunlik ma'lumot (Area / Details) yuklash",
      "Ma'lumot yuklash sahifasi: Area/Details fayllarini yuklaydi va yuklash tarixini ko'radi", None),
     ("republic.upload", "Ma'lumot yuklash", "Respublika PDF'ini yuklash",
      "Respublika dinamikasi PDF'ini yuklaydi, yuklangan sanalar ro'yxatini ko'radi", None),
+    ("ag.upload", "Ma'lumot yuklash", "AG PDF'ini yuklash",
+     "AG dinamikasi PDF'ini yuklaydi, yuklangan sanalar ro'yxatini ko'radi", None),
     ("data.delete", "Ma'lumot yuklash", "Yuklangan ma'lumotni o'chirish",
-     "Yuklash tarixidagi yozuvni, fayllarni va shu sana dinamikasini (Kunlik / Respublika) o'chiradi", None),
+     "Yuklash tarixidagi yozuvni, fayllarni va shu sana dinamikasini (Kunlik / Respublika / AG) o'chiradi", None),
 
     ("drill.view", "Ro'yxat va hisobotlar", "Raqam ustiga bosib nomma-nom ro'yxatni ko'rish",
      "Jadvaldagi raqamni bosganda hisoblagich/TP ro'yxati ochiladi", None),
@@ -28,6 +32,8 @@ PERMS = [
      "Nomma-nom ro'yxatni Excel qilib saqlaydi", "drill.view"),
     ("republic.original", "Ro'yxat va hisobotlar", "Respublika asl PDF faylini ochish va yuklab olish",
      "Respublika markazi yuborgan PDF'ni brauzerda ochadi yoki yuklab oladi", "republic.view"),
+    ("ag.original", "Ro'yxat va hisobotlar", "AG asl PDF faylini ochish va yuklab olish",
+     "AG markazi yuborgan PDF'ni brauzerda ochadi yoki yuklab oladi", "ag.view"),
     ("dynamics.compare", "Ro'yxat va hisobotlar", "Dinamika sanalarini o'zgartirib solishtirish",
      "Istalgan ikki sanani tanlab solishtiradi (bo'lmasa — joriy oy boshi bilan)", None),
     ("report.download", "Ro'yxat va hisobotlar", "Dinamikani Excel / PDF ko'rinishida yuklab olish",
@@ -39,7 +45,7 @@ PERMS = [
      "TP'larni bir brigadadan boshqasiga o'tkazadi", "brigade.view"),
 
     ("telegram.send", "Telegram va sozlamalar", "Hisobotlarni Telegramga yuborish",
-     "Kunlik va Respublika dinamikasi hisobotlarini kanal/guruhlarga yuboradi", None),
+     "Kunlik, Respublika va AG dinamikasi hisobotlarini kanal/guruhlarga yuboradi", None),
     ("telegram.message", "Telegram va sozlamalar", "Xabar yuborish (matn, rasm, video)",
      "«Xabar yuborish» bo'limi: erkin xabar tayyorlab kanal/guruhlarga yuboradi", None),
     ("telegram.journal", "Telegram va sozlamalar", "Yuborilganlar jurnali va «Tanishdim» holati",
@@ -57,7 +63,41 @@ PERMS = [
 PERM_CODES = {p[0] for p in PERMS}
 NEEDS = {p[0]: p[4] for p in PERMS if p[4]}
 
+_TBL = ["view.konsentrator", "view.aloqa", "view.obxod"]
+# Tayyor ruxsat to'plamlari — YAGONA manba (frontend /meta/bootstrap orqali oladi)
+PRESETS = [
+    {"name": "Kuzatuvchi", "hint": "Faqat jadvallarni ko'radi", "codes": _TBL + ["republic.view", "ag.view"]},
+    {"name": "Operator", "hint": "Jadval, xarita, ro'yxat va Excel/PDF",
+     "codes": _TBL + ["republic.view", "map.view", "drill.view", "export", "dynamics.compare", "report.download",
+                      "republic.original", "ag.view", "ag.original"]},
+    {"name": "Brigadir", "hint": "Brigadalar va xarita",
+     "codes": _TBL + ["map.view", "brigade.view", "brigade.edit", "brigade.assign", "drill.view", "export"]},
+    {"name": "Ma'lumot kiritish", "hint": "Fayl yuklaydi va o'chiradi",
+     "codes": _TBL + ["republic.view", "data.upload", "republic.upload", "data.delete", "republic.original",
+                      "ag.view", "ag.upload", "ag.original"]},
+    {"name": "Telegram operatori", "hint": "Hisobot va xabar yuboradi",
+     "codes": _TBL + ["republic.view", "ag.view", "report.download", "telegram.send", "telegram.message",
+                      "telegram.journal"]},
+]
+
+
+def validate_catalog() -> list[str]:
+    """Katalog izchilligini tekshiradi (testlar chaqiradi): xatolar ro'yxati, bo'sh bo'lsa hammasi joyida."""
+    errs = []
+    codes = [p[0] for p in PERMS]
+    errs += [f"takroriy kod: {c}" for c in set(codes) if codes.count(c) > 1]
+    errs += [f"{p[0]}: bog'liq ruxsat yo'q ({p[4]})" for p in PERMS if p[4] and p[4] not in PERM_CODES]
+    for pr in PRESETS:
+        errs += [f"preset {pr['name']}: noma'lum kod {c}" for c in pr["codes"] if c not in PERM_CODES]
+    for old, new in list(INHERIT.items()) + [i for g in INHERIT_GROUPS.values() for i in g.items()]:
+        errs += [f"INHERIT: noma'lum kod {c}" for c in [old, *new] if c not in PERM_CODES]
+    return errs
+
 # Eski ruxsatlar bo'yicha yangi ruxsatlarni avtomatik berish (bir marta): (eski, [yangilari])
 INHERIT = {"data.upload": ["republic.upload", "data.delete"],
            "telegram.send": ["telegram.message", "telegram.journal"],
            "republic.view": ["republic.original"]}
+
+# Guruh bo'yicha (bir marta): yangi bo'lim ruxsatlarini mavjud bo'lim ruxsati bor xodimlarga berish
+INHERIT_GROUPS = {"grp:ag": {"republic.view": ["ag.view"], "republic.upload": ["ag.upload"],
+                             "republic.original": ["ag.original"]}}

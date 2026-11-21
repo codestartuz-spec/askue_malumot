@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user
 from ..models import User
-from ..perms import PERMS
+from ..perms import PERMS, PRESETS
+from ..settings_store import app_cfg
 from .auth import user_out
 
 router = APIRouter(prefix="/meta", tags=["meta"])
@@ -34,5 +35,6 @@ def bootstrap(user: User = Depends(current_user), db: Session = Depends(get_db))
                         "by": last["created_by"]} if last else None,
         "bot_username": bot,
         "worker_alive": bool(hb and time.time() - int(hb) < 20),
+        "presets": PRESETS, "region_name": app_cfg("region_name"),
         "perms": [{"code": c, "group": g, "name": n, "desc": d, "needs": nd} for c, g, n, d, nd in PERMS],
     }

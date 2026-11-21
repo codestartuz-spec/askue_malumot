@@ -19,9 +19,21 @@ def _save(f: UploadFile, tag: str) -> str:
     if not name.lower().endswith((".csv", ".csv.gz", ".gz")):
         raise HTTPException(400, f"{tag}: faqat .csv.gz yoki .csv fayl qabul qilinadi")
     path = settings.data_dir / "uploads" / f"{int(time.time() * 1000)}_{tag}_{name}"
-    with open(path, "wb") as out:
-        while chunk := f.file.read(1024 * 1024):
-            out.write(chunk)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    limit, size, first = settings.max_upload_mb * 1048576, 0, True
+    try:
+        with open(path, "wb") as out:
+            while chunk := f.file.read(1024 * 1024):
+                if first and name.lower().endswith(".gz") and chunk[:2] != b"\x1f\x8b":
+                    raise HTTPException(400, f"{tag}: bu haqiqiy .gz fayl emas")
+                first = False
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(400, f"{tag}: fayl {settings.max_upload_mb} MB dan katta")
+                out.write(chunk)
+    except HTTPException:
+        path.unlink(missing_ok=True)
+        raise
     return str(path)
 
 

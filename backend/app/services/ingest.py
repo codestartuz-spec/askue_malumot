@@ -12,6 +12,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from ..config import settings
 from ..db import engine
 from .staff import normalize_key, split_staff
 
@@ -50,9 +51,31 @@ def esp_sort(name: str) -> int:
     return 500
 
 
+class _Capped(io.RawIOBase):
+    """gzip oqimidan o'qilgan hajmni cheklaydi (gzip-bomba himoyasi)."""
+
+    def __init__(self, inner, limit: int):
+        self.inner, self.limit, self.n = inner, limit, 0
+
+    def readable(self):
+        return True
+
+    def readinto(self, b):
+        data = self.inner.read(len(b))
+        self.n += len(data)
+        if self.n > self.limit:
+            raise IngestError(f"Fayl ochilgach juda katta (>{self.limit // 1048576} MB) — qabul qilinmadi")
+        b[:len(data)] = data
+        return len(data)
+
+
 def open_csv(path: str):
+    """CSV/CSV.GZ ni oqim bilan o'qiydi (butun fayl xotiraga yuklanmaydi)."""
     raw = open(path, "rb")
-    stream = gzip.GzipFile(fileobj=raw) if path.lower().endswith(".gz") else raw
+    if path.lower().endswith(".gz"):
+        stream = io.BufferedReader(_Capped(gzip.GzipFile(fileobj=raw), settings.max_unzipped_mb * 1048576), 1 << 20)
+    else:
+        stream = raw
     return raw, csv.reader(io.TextIOWrapper(stream, encoding="utf-8-sig", newline=""))
 
 

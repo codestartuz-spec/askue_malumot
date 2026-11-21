@@ -36,9 +36,6 @@ def period(data: dict) -> str:
     return dmy(data.get("to"))
 
 
-REGION_NAME = "Qashqadaryo hududiy filiali"
-
-
 def title_of(table: str, scope: str) -> str:
     return f"{scope} {S.TABLES[table]['title']}"
 

@@ -1,4 +1,3 @@
-import time
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -31,22 +30,3 @@ def read_token(token: str) -> tuple[int, str] | None:
         return int(data["sub"]), str(data.get("sid") or "")
     except Exception:
         return None
-
-
-# Oddiy login urinishlarini cheklash (xotirada)
-_fails: dict[str, list[float]] = {}
-
-
-def too_many_attempts(key: str, limit: int = 8, window: int = 300) -> bool:
-    now = time.time()
-    arr = [t for t in _fails.get(key, []) if now - t < window]
-    _fails[key] = arr
-    return len(arr) >= limit
-
-
-def register_fail(key: str) -> None:
-    _fails.setdefault(key, []).append(time.time())
-
-
-def clear_fails(key: str) -> None:
-    _fails.pop(key, None)

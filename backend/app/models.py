@@ -161,6 +161,7 @@ class Device(Base):
     kind: Mapped[str] = mapped_column(String(20), default="desktop")
     ua: Mapped[str] = mapped_column(String(400), default="")
     ip: Mapped[str] = mapped_column(String(64), default="")
+    ua_hash: Mapped[str] = mapped_column(String(32), default="", server_default="", index=True)
     first_seen: Mapped[datetime] = mapped_column(DateTime, default=now)
     last_seen: Mapped[datetime] = mapped_column(DateTime, default=now)
     last_user: Mapped[str] = mapped_column(String(64), default="")
@@ -287,6 +288,18 @@ snapshots = Table(
 class RepublicReport(Base):
     """Respublika dinamikasi: har bir yuklangan PDF (oy boshidan shu sanagacha) — viloyat jami qatorlari."""
     __tablename__ = "republic_reports"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    end_date: Mapped[date] = mapped_column(Date, unique=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    filename: Mapped[str] = mapped_column(String(200), default="")
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    uploaded_by: Mapped[str] = mapped_column(String(64), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class AgReport(Base):
+    """AG dinamikasi: har bir yuklangan PDF (boshlang'ich sanadan shu sanagacha) — hududlar kesimidagi jadval."""
+    __tablename__ = "ag_reports"
     id: Mapped[int] = mapped_column(primary_key=True)
     end_date: Mapped[date] = mapped_column(Date, unique=True)
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)

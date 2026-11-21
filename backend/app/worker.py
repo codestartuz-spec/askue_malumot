@@ -10,12 +10,19 @@ from .init_db import init_db
 from .services.backup import start_scheduler
 from .services.jobs import run_job, start_heartbeat
 from .services.telegram import start_polling
+from . import tasks
+from .store import get_store
 
 
 def claim() -> int | None:
+    """Navbatdagi ishni atomik tarzda oladi: bir nechta worker bo'lsa ham bitta ish ikki marta bajarilmaydi."""
     with engine.begin() as c:
         row = c.execute(text("SELECT id FROM jobs WHERE status='queued' ORDER BY id LIMIT 1")).first()
-        return row[0] if row else None
+        if not row:
+            return None
+        n = c.execute(text("UPDATE jobs SET status='running', started_at=:t WHERE id=:i AND status='queued'"),
+                      {"t": datetime.now(), "i": row[0]}).rowcount
+        return row[0] if n == 1 else None
 
 
 def main() -> None:
@@ -37,6 +44,12 @@ def main() -> None:
     start_heartbeat()
     start_polling()
     start_scheduler()
+    if get_store().is_redis:     # Telegramga yuborish vazifalari Redis navbatidan alohida oqimda olinadi
+        n = tasks.recover()
+        if n:
+            print(f"Yarim qolgan {n} ta vazifa navbatga qaytarildi", flush=True)
+        import threading
+        threading.Thread(target=tasks.consume_forever, daemon=True, name="tasks").start()
     print("Worker ishga tushdi. Navbat kutilmoqda...", flush=True)
     while True:
         job_id = claim()

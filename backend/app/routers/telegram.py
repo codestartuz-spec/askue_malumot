@@ -1,7 +1,8 @@
 import mimetypes
 import re
-import threading
+import shutil
 import time
+from pathlib import Path
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -9,7 +10,11 @@ from pydantic import BaseModel
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
-from ..db import engine, get_db
+from ..db import engine, get_db, upsert_kv
+from ..config import settings
+from ..services import sendjobs
+from ..tasks import submit, task
+from ..services.crypto import decrypt_text, encrypt_text
 from ..deps import log, need, need_any, sadmin_only
 from ..models import User
 from ..services import posts as P
@@ -27,7 +32,7 @@ def _kv(db: Session, k: str) -> str:
 
 
 def _set_kv(db: Session, k: str, v: str) -> None:
-    db.execute(text("INSERT INTO kv (k,v) VALUES (:k,:v) ON DUPLICATE KEY UPDATE v=VALUES(v)"), {"k": k, "v": v})
+    upsert_kv(db.connection(), k, v)
 
 
 def _chats(db: Session, only_active: bool) -> list[dict]:
@@ -44,7 +49,7 @@ def _chats(db: Session, only_active: bool) -> list[dict]:
 
 @router.get("")
 def overview(_: User = Depends(need_any("settings.manage", "telegram.send", "telegram.message", "telegram.journal", "system.view", "backup.manage")), db: Session = Depends(get_db)):
-    token = _kv(db, "tg_token")
+    token = decrypt_text(_kv(db, "tg_token"))
     hb = _kv(db, "tg_poll_hb")
     return {"configured": bool(token), "token": _mask(token), "bot_username": _kv(db, "tg_bot_username"),
             "bot_name": _kv(db, "tg_bot_name"), "poll_alive": bool(hb and time.time() - int(hb) < 60),
@@ -62,7 +67,7 @@ def set_token(body: TokenIn, me: User = Depends(sadmin_only), db: Session = Depe
         bot = tg.call("getMe", token=token, timeout=20)
     except tg.TgError as e:
         raise HTTPException(400, f"Token tekshiruvdan o'tmadi: {e}") from e
-    _set_kv(db, "tg_token", token)
+    _set_kv(db, "tg_token", encrypt_text(token))
     _set_kv(db, "tg_bot_username", bot.get("username", ""))
     _set_kv(db, "tg_bot_name", bot.get("first_name", ""))
     log(db, me.username, "telegram_token", f"Bot ulandi: @{bot.get('username')}")
@@ -140,10 +145,12 @@ MAX_FILE = 50 * 1024 * 1024
 MAX_FILES = 10
 
 
-def _run_msg(job_id: int, chats: list[tuple[str, str]], msg: str, files: list[tuple[str, bytes, str]],
-             items: dict[str, int], ack: bool) -> None:
+@task("tg.message")
+def _run_msg(job_id: int, chats: list, msg: str, file_meta: list, items: dict, ack: bool) -> None:
+    """file_meta: [[nom, yo'l, mime], ...] — fayllar API va worker orasida umumiy data/outbox papkasi orqali uzatiladi."""
     lines: list[str] = []
     done = fails = 0
+    files = [(n, Path(p).read_bytes(), m) for n, p, m in file_meta]
 
     def flush(status="running"):
         with engine.begin() as c:
@@ -163,11 +170,13 @@ def _run_msg(job_id: int, chats: list[tuple[str, str]], msg: str, files: list[tu
                 fails += 1
             done += 1
             flush()
-            time.sleep(1.0)
+            time.sleep(min(1.0, settings.send_delay_sec))
         flush("error" if fails >= len(chats) else "done")
     except Exception as e:  # noqa: BLE001
         lines.append(f"✗ Kutilmagan xato: {e}")
         flush("error")
+    finally:
+        shutil.rmtree(settings.data_dir / "outbox" / str(job_id), ignore_errors=True)
 
 
 @router.post("/send")
@@ -189,20 +198,21 @@ async def send_message(chat_ids: str = Form(...), message: str = Form(""), ack: 
             raise HTTPException(400, f"«{f.filename}» hajmi 50 MB dan katta (Telegram cheklovi)")
         mime = f.content_type or mimetypes.guess_type(f.filename)[0] or "application/octet-stream"
         blobs.append((f.filename, data, mime))
-    if not db.execute(text("SELECT 1 FROM kv WHERE k='tg_token'")).first():
-        raise HTTPException(400, "Telegram bot sozlanmagan")
-    chats = [(r[0], r[1]) for r in db.execute(text("SELECT chat_id, title FROM tg_chats WHERE is_active=1 AND id IN :ids")
-                                              .bindparams(bindparam("ids", expanding=True)), {"ids": ids})]
-    if not chats:
-        raise HTTPException(400, "Tanlangan kanallar topilmadi")
-    db.execute(text("INSERT INTO send_jobs (status,progress,log,created_by,created_at) VALUES ('running',0,'',:u,:t)"),
-               {"u": me.username, "t": datetime.now()})
-    job_id = db.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+    sendjobs.require_bot(db)
+    chats = sendjobs.chats_for(db, ids)
+    job_id = sendjobs.create_job(db, me.username)
     log(db, me.username, "telegram_xabar", f"→ {', '.join(c[1] for c in chats)}"
         + (f" ({len(blobs)} ta fayl)" if blobs else ""))
     db.commit()
     plain = re.sub(r"<[^>]+>", "", message).strip()
     title = (plain.split("\n")[0][:120] if plain else f"{len(blobs)} ta fayl")
     _pid, items = P.create_post("xabar", title, message, [b[0] for b in blobs], ack, me.username, chats)
-    threading.Thread(target=_run_msg, args=(job_id, chats, message, blobs, items, ack), daemon=True).start()
+    out = settings.data_dir / "outbox" / str(job_id)
+    meta = []
+    if blobs:
+        out.mkdir(parents=True, exist_ok=True)
+        for i, (n, data, mime) in enumerate(blobs):
+            (out / str(i)).write_bytes(data)
+            meta.append([n, str(out / str(i)), mime])
+    submit("tg.message", job_id, chats, message, meta, items, ack)
     return {"id": job_id}
