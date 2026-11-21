@@ -6,7 +6,6 @@ import { useAuth } from '../auth'
 import { useToast } from '../ui'
 import DynPage from './DynPage'
 import SendReport from './SendReport'
-import TgBotLink from '../TgBot'
 
 const TABS = [
   { k: 'konsentrator', label: 'Konsentratorlar', icon: Radio, perm: 'view.konsentrator' },
@@ -56,7 +55,6 @@ export default function Dynamics() {
               <button onClick={() => dl('pdf', data)}><FileText size={17} />PDF</button>
             </div>)}
         </div>)}
-      {can('telegram.send') && <TgBotLink label="Telegram bot" />}
       {can('telegram.send') && <button className="btn primary" disabled={!data?.rows?.length} onClick={() => setSend({ from: data?.base, to: data?.to })}><Send size={16} />Telegramga yuborish</button>}
     </div>
   )

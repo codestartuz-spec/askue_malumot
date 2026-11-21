@@ -8,8 +8,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .init_db import init_db
+from .services.devices import client_ip, req_ip
 from .routers import (audit, auth, brigades, drill, dynamics, home, map as map_router, meta, posts, republic, reports, system,
-                      telegram, uploads, users)
+                      telegram, uploads, users, devices)
 
 
 @asynccontextmanager
@@ -27,7 +28,13 @@ app.add_middleware(GZipMiddleware, minimum_size=800)
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
                    allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, system, posts, home):
+@app.middleware("http")
+async def _ip_ctx(request, call_next):
+    req_ip.set(client_ip(request))
+    return await call_next(request)
+
+
+for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, system, posts, home, devices):
     app.include_router(r.router, prefix="/api")
 
 

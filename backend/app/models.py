@@ -148,7 +148,40 @@ class Audit(Base):
     username: Mapped[str] = mapped_column(String(64), default="")
     action: Mapped[str] = mapped_column(String(60))
     detail: Mapped[str] = mapped_column(Text, default="")
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now, index=True)
+
+
+class Device(Base):
+    """Ilovadan foydalangan har bir qurilma (brauzer)."""
+    __tablename__ = "devices"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(120), default="")
+    kind: Mapped[str] = mapped_column(String(20), default="desktop")
+    ua: Mapped[str] = mapped_column(String(400), default="")
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    first_seen: Mapped[datetime] = mapped_column(DateTime, default=now)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, default=now)
+    last_user: Mapped[str] = mapped_column(String(64), default="")
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    blocked_by: Mapped[str] = mapped_column(String(64), default="")
+
+
+class UserSession(Base):
+    """Kirish sessiyasi: bitta loginda faqat bitta faol sessiya bo'ladi."""
+    __tablename__ = "user_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sid: Mapped[str] = mapped_column(String(40), unique=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    username: Mapped[str] = mapped_column(String(64), default="")
+    device_id: Mapped[int] = mapped_column(Integer, index=True)
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, default=now)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str] = mapped_column(String(200), default="")
 
 
 class Kv(Base):

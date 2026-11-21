@@ -36,32 +36,33 @@ const STATUS = {
   error: { t: 'Xatolik', c: 'red', i: XCircle },
 }
 
-function JobCard({ j, onDelete }) {
-  const S = STATUS[j.status]
-  const active = j.status === 'queued' || j.status === 'running'
+function JobTable({ jobs, onDelete }) {
   return (
-    <div className={`job ${j.status}`}>
-      <div className="job-top">
-        <span className={`tag ${S.c}`}><S.i size={14} className={j.status === 'running' ? 'spin' : ''} />{S.t}</span>
-        <b>#{j.id}</b><span className="mut"><CalendarDays size={14} /> {dmy(j.snap_date)}</span>
-        <span className="mut right">{dt(j.created_at)} • {j.created_by}</span>
-        {onDelete && j.status !== 'running' && <button className="icon-btn danger" title="Yuklashni o'chirish" onClick={() => onDelete(j)}><Trash2 size={16} /></button>}
-      </div>
-      <div className="job-files">{[j.area_name, j.details_name].filter(Boolean).join('  +  ')}</div>
-      {active && (
-        <div className={`progress st-${j.status}`}><div className="bar" style={{ width: `${Math.max(j.progress, j.status === 'queued' ? 4 : 0)}%` }} /><span>{j.status === 'queued' ? 'Navbat kutilmoqda' : `${Math.round(j.progress)}%`}</span></div>)}
-      {active && <div className="stage">{j.stage}</div>}
-      {j.status === 'error' && <div className="job-err"><AlertTriangle size={16} />{j.message}</div>}
-      {j.status === 'done' && j.stats && (
-        <div className="stats">
-          {j.stats.area_rows != null && <span>TP: <b>{num(j.stats.area_rows)}</b></span>}
-          {j.stats.new_brigades > 0 && <span>Yangi brigada: <b>{j.stats.new_brigades}</b></span>}
-          {j.stats.tp_removed > 0 && <span>O'chirilgan TP: <b>{num(j.stats.tp_removed)}</b></span>}
-          {j.stats.meters != null && <span>Hisoblagich: <b>{num(j.stats.meters)}</b></span>}
-          {j.stats.meters_removed > 0 && <span>O'chirilgan: <b>{num(j.stats.meters_removed)}</b></span>}
-          {j.stats.meters_without_tp > 0 && <span className="warn">TP topilmagan: <b>{num(j.stats.meters_without_tp)}</b></span>}
-        </div>)}
-    </div>
+    <div className="card tcard"><div className="tbl-scroll"><table className="list jobs-table">
+      <thead><tr><th>Holat</th><th>№</th><th>Sana</th><th>Fayllar</th><th>Natija</th><th>Yuklagan</th><th /></tr></thead>
+      <tbody>{jobs.map((j) => {
+        const S = STATUS[j.status]
+        const active = j.status === 'queued' || j.status === 'running'
+        const st = j.stats || {}
+        return (
+          <tr key={j.id} className={`job-row ${j.status}`}>
+            <td><span className={`tag ${S.c}`}><S.i size={14} className={j.status === 'running' ? 'spin' : ''} />{S.t}</span></td>
+            <td className="b">#{j.id}</td>
+            <td className="nowrap-d">{dmy(j.snap_date)}</td>
+            <td className="job-files-c mut">{[j.area_name, j.details_name].filter(Boolean).map((n, i) => <div key={i}>{n}</div>)}
+              {active && <><div className={`progress st-${j.status}`}><div className="bar" style={{ width: `${Math.max(j.progress, j.status === 'queued' ? 4 : 0)}%` }} /><span>{j.status === 'queued' ? 'Navbat kutilmoqda' : `${Math.round(j.progress)}%`}</span></div><div className="stage">{j.stage}</div></>}
+              {j.status === 'error' && <div className="job-err"><AlertTriangle size={15} />{j.message}</div>}</td>
+            <td className="job-stats">{j.status === 'done' && j.stats ? <>
+              {st.area_rows != null && <span>TP: <b>{num(st.area_rows)}</b></span>}
+              {st.meters != null && <span>Hisoblagich: <b>{num(st.meters)}</b></span>}
+              {st.new_brigades > 0 && <span>Yangi brigada: <b>{st.new_brigades}</b></span>}
+              {st.tp_removed > 0 && <span>O'chirilgan TP: <b>{num(st.tp_removed)}</b></span>}
+              {st.meters_removed > 0 && <span>O'chirilgan hisoblagich: <b>{num(st.meters_removed)}</b></span>}
+              {st.meters_without_tp > 0 && <span className="warn">TP topilmagan: <b>{num(st.meters_without_tp)}</b></span>}</> : <span className="mut">—</span>}</td>
+            <td className="mut nowrap-d">{dt(j.created_at)}<div>{j.created_by}</div></td>
+            <td className="acts">{onDelete && j.status !== 'running' && <button className="icon-btn danger" title="Yuklashni o'chirish" onClick={() => onDelete(j)}><Trash2 size={16} /></button>}</td>
+          </tr>)})}</tbody>
+    </table></div></div>
   )
 }
 
@@ -194,7 +195,7 @@ function DailyUpload() {
         {(area || details) && !(area && details) && <div className="hint warn-hint">Eslatma: dinamika to'g'ri bo'lishi uchun ikkala faylni birga yuklash tavsiya etiladi.</div>}
       </div>
       <h3 className="sec-title">Yuklashlar tarixi</h3>
-      <div className="jobs">{jobs.length === 0 ? <div className="card pad mut">Hali yuklash bo'lmagan.</div> : jobs.map((j) => <JobCard key={j.id} j={j} onDelete={can('data.delete') ? setAsk : null} />)}</div>
+      {jobs.length === 0 ? <div className="card pad mut">Hali yuklash bo'lmagan.</div> : <JobTable jobs={jobs} onDelete={can('data.delete') ? setAsk : null} />}
       {ask && <Confirm icon={Trash2} danger title="Yuklashni o'chirish" ok="Ha, o'chirish" onOk={delJob} onCancel={() => setAsk(null)}>
         <b>#{ask.id}</b> ({dmy(ask.snap_date)}) yuklash yozuvi va serverdagi fayllari o'chiriladi{ask.status === 'done' ? <>, shuningdek <b>{dmy(ask.snap_date)}</b> sanasining dinamika ma'lumoti ham (agar shu sana uchun boshqa yuklash bo'lmasa)</> : ''}.
         <small className="hint">Hozirgi hisoblagich va TP ro'yxatlari o'zgarmaydi — ular keyingi yuklash bilan yangilanadi. Qaytarib bo'lmaydi.</small></Confirm>}

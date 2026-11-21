@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, getToken, setToken } from './api'
+import { api, deviceId, getToken, setToken } from './api'
 
 const Ctx = createContext(null)
 export const useAuth = () => useContext(Ctx)
@@ -22,12 +22,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async (username, password) => {
-    const r = await api.post('/auth/login', { username, password })
+    const r = await api.post('/auth/login', { username, password, device_id: deviceId() })
     setToken(r.token)
     setLoading(true)
     await load()
   }
-  const logout = () => { setToken(''); setBoot(null) }
+  const logout = () => { api.post('/auth/logout', {}).catch(() => {}); setToken(''); setBoot(null) }
 
   const value = useMemo(() => {
     const perms = new Set(boot?.user?.perms || [])

@@ -6,6 +6,7 @@ from .db import engine
 COLUMNS = [
     ("users", "phone", "VARCHAR(30) NULL"),
     ("users", "chat_id", "VARCHAR(30) NULL"),
+    ("audit", "ip", "VARCHAR(64) NULL"),
     ("trs", "lat", "DOUBLE NULL"),
     ("trs", "lon", "DOUBLE NULL"),
     ("tg_chats", "members", "INT NULL"),

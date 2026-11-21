@@ -1,5 +1,14 @@
 const BASE = '/api'
 export const getToken = () => localStorage.getItem('askue_token') || ''
+export const deviceId = () => {
+  let d = ''
+  try { d = localStorage.getItem('askue_dev') || '' } catch { /* */ }
+  if (!d) {
+    d = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`).replace(/[^a-zA-Z0-9]/g, '')
+    try { localStorage.setItem('askue_dev', d) } catch { /* */ }
+  }
+  return d
+}
 export const setToken = (t) => (t ? localStorage.setItem('askue_token', t) : localStorage.removeItem('askue_token'))
 
 async function request(path, { method = 'GET', body, form, signal } = {}) {
@@ -17,6 +26,9 @@ async function request(path, { method = 'GET', body, form, signal } = {}) {
     throw new Error("Serverga ulanib bo'lmadi")
   }
   if (res.status === 401 && path !== '/auth/login') {
+    let m = ''
+    try { m = (await res.clone().json()).detail || '' } catch { /* */ }
+    try { if (m && m !== 'Tizimga qayta kiring') sessionStorage.setItem('askue_msg', m) } catch { /* */ }
     window.dispatchEvent(new Event('askue-logout'))
   }
   if (!res.ok) {

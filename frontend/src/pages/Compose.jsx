@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Italic, Underline, Strikethrough, Code2, Link2, ImagePlus, Film, X, Send, Megaphone, Users, CheckCircle2, AlertTriangle, Eye, Smartphone, Play, MailCheck } from 'lucide-react'
 import { api, uploadForm } from '../api'
-import { Members, useToast } from '../ui'
-import TgBotLink from '../TgBot'
+import { ChatTable, useToast } from '../ui'
 
 const MAX_FILES = 10
 const MAX_MB = 50
@@ -136,14 +135,9 @@ export default function Compose({ chats }) {
   return (
     <div className="compose">
       <section className="card pad set-card">
-        <h3><Send size={20} />Yangi xabar <span className="grow" /><TgBotLink label="Telegram bot" /></h3>
+        <h3><Send size={20} />Yangi xabar </h3>
         <div className="mp-sec dark">1. Qaysi kanal / guruhga</div>
-        <div className="pick-chats">{active.map((c) => (
-          <label key={c.id} className={`chat sm ${sel.has(c.id) ? 'on' : ''}`}><input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} disabled={busy} />
-            <i>{c.kind === 'kanal' ? <Megaphone size={16} /> : <Users size={16} />}</i><span><b>{c.title} <Members c={c} /></b></span></label>))}</div>
-        <div className="row-mini"><button className="link-btn" onClick={() => setSel(new Set(active.map((c) => c.id)))} disabled={busy}>Hammasini tanlash</button>
-          <button className="link-btn" onClick={() => setSel(new Set())} disabled={busy}>Tozalash</button></div>
-
+        <ChatTable chats={active} sel={sel} busy={busy} onToggle={toggle} onAll={(v) => setSel(v ? new Set(active.map((c) => c.id)) : new Set())} />
         <div className="mp-sec dark">2. Rasm yoki video <small>(ixtiyoriy, {MAX_FILES} tagacha, har biri {MAX_MB} MB gacha)</small></div>
         <div className={`cdrop ${drag ? 'over' : ''}`} onDragOver={(e) => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); add(e.dataTransfer.files) }} onClick={() => !busy && fi.current?.click()}>

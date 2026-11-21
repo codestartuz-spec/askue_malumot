@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Table2, MapPinned, HardHat, UploadCloud, Users, ScrollText, LogOut, KeyRound, Menu, Database, X, ChevronDown, Zap, Settings as Cog, Globe2, UserRound, Phone, Send } from 'lucide-react'
+import { Home, Table2, MapPinned, HardHat, UploadCloud, Users, ScrollText, LogOut, KeyRound, Menu, Database, X, ChevronDown, Zap, Settings as Cog, Globe2, UserRound, Phone, Send, MonitorSmartphone } from 'lucide-react'
 import { useAuth } from './auth'
 import { Confirm, Logo, Modal, useToast } from './ui'
 import EnergyBackground from './bg'
@@ -19,6 +19,7 @@ const NAV = [
   { to: '/yuklash', icon: UploadCloud, label: "Ma'lumot yuklash", any: ['data.upload', 'republic.upload'] },
   { to: '/sozlamalar', icon: Cog, label: 'Sozlamalar', any: ['settings.manage', 'system.view', 'backup.manage'] },
   { to: '/xodimlar', icon: Users, label: 'Xodimlar va ruxsatlar', sadmin: true },
+  { to: '/qurilmalar', icon: MonitorSmartphone, label: 'Qurilmalar', sadmin: true },
   { to: '/jurnal', icon: ScrollText, label: 'Harakatlar jurnali', perm: 'audit.view' },
 ]
 
@@ -64,6 +65,12 @@ function PasswordModal({ onClose }) {
 export default function Layout({ children }) {
   const { user, can, boot, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('askue_side') === '0' } catch { return false } })
+  const toggleSide = () => {
+    if (window.matchMedia('(max-width:1000px)').matches) { setOpen((v) => !v); return }
+    setCollapsed((v) => { const n = !v; try { localStorage.setItem('askue_side', n ? '0' : '1') } catch {} ; return n })
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 260)
+  }
   const [menu, setMenu] = useState(false)
   const [pw, setPw] = useState(false)
   const [prof, setProf] = useState(false)
@@ -75,12 +82,12 @@ export default function Layout({ children }) {
   const title = NAV.find((n) => n.to && (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))?.label || ''
   const lu = boot?.last_upload
   return (
-    <div className="shell">
+    <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
       <EnergyBackground />
       <aside className={`side ${open ? 'open' : ''}`}>
         <div className="side-logo">
           <Logo theme="dark" height={64} />
-          <button className="icon-btn only-mobile" onClick={() => setOpen(false)}><X size={20} /></button>
+          <button className="icon-btn side-x" onClick={toggleSide} aria-label="Menyuni yopish" title="Menyuni yopish"><X size={20} /></button>
         </div>
         <div className="side-brand"><Zap size={14} /><span>ASKUE ma'lumot</span></div>
         <nav>
@@ -95,7 +102,7 @@ export default function Layout({ children }) {
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
         <header className="top">
-          <button className="icon-btn only-mobile" onClick={() => setOpen(true)} aria-label="Menyu"><Menu size={22} /></button>
+          <button className="icon-btn menu-btn" onClick={toggleSide} aria-label="Menyu" title="Menyu"><Menu size={22} /></button>
           <h1 className="top-title">{title}</h1>
           <div className="top-right">
             {lu && <div className="chip" title={`Yuklagan: ${lu.by}, ${dt(lu.finished_at)}`}><Database size={15} /><span>Ma'lumot: {dmy(lu.snap_date)}</span></div>}
@@ -114,6 +121,7 @@ export default function Layout({ children }) {
           </div>
         </header>
         <main className={`content ${loc.pathname.startsWith('/xarita') ? 'content-map' : ''}`}>{children}</main>
+        {!loc.pathname.startsWith('/xarita') && <footer className="app-foot">© {new Date().getFullYear()} • «CodeStart» MChJ tomonidan ishlab chiqilgan</footer>}
       </div>
       {pw && <PasswordModal onClose={() => setPw(false)} />}
       {prof && <ProfileModal onClose={() => setProf(false)} />}

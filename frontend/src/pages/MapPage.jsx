@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Search, Layers, SlidersHorizontal, X, MapPinned, Crosshair, Info, MapPin, Cpu, Activity, FilterX } from 'lucide-react'
+import { Search, Layers, SlidersHorizontal, X, MapPinned, Crosshair, Info, MapPin, Cpu, Activity, FilterX, ChevronDown, ChevronUp } from 'lucide-react'
 import { api, qs } from '../api'
 import { useAuth } from '../auth'
 import { METRIC_TITLES } from '../tables'
@@ -201,6 +201,8 @@ export default function MapPage() {
   const toggle = (set, setter, k) => setter((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
   const allKinds = metric ? metricKinds(metric) : ['aholi', 'ulgurji', 'balans', 'tr']
   const clearAll = () => { setParams({ esp: '', brig: '', metric: '' }); setMSt(''); setTSt(''); setLSt(''); setKinds(new Set(['aholi', 'ulgurji', 'balans', 'tr'])) }
+  const activeN = (esp ? 1 : 0) + (brig !== '' ? 1 : 0) + status.size + (kinds.size < allKinds.length ? 1 : 0) + (metric ? 1 : 0)
+  const [legend, setLegend] = useState(true)
   const locate = () => map.current?.locate({ setView: true, maxZoom: 16 })
   useEffect(() => { setTimeout(() => map.current?.invalidateSize(), 320) }, [panel])
   const cov = stats && (stats.meters + stats.trs) ? stats : null
@@ -214,9 +216,21 @@ export default function MapPage() {
         {Object.entries(TILES).map(([k, t]) => <button key={k} className={layer === k ? 'on' : ''} onClick={() => setLayer(k)}>{t.name}</button>)}
         <button className="loc" onClick={locate} title="Mening joylashuvim"><Crosshair size={16} /></button>
       </div>
+      <div className={`map-legend ${legend ? 'open' : ''}`}>
+        <button className="ml-h" onClick={() => setLegend(!legend)}><Activity size={14} />Belgilar{legend ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>
+        {legend && <div className="ml-b">
+          <div className="ml-t">Hisoblagich (aloqa)</div>
+          {METER_ST.map((x) => <div key={x.k} className="ml-r"><i style={{ background: x.color }} />{x.label}</div>)}
+          <div className="ml-t">Konsentrator</div>
+          <div className="ml-r"><i className="sq" style={{ background: '#0b2a6b' }} />Konsentrator (TP)</div>
+          <div className="ml-r"><i className="ring" />Guruh: qizil bo'lak — aloqasizlar ulushi</div>
+        </div>}
+      </div>
       {panel && (
         <aside className="map-panel">
-          <div className="mp-title"><MapPinned size={19} /><b>Xarita filtri</b>{busy && <span className="mp-busy" />}</div>
+          <div className="mp-title"><MapPinned size={19} /><b>Xarita filtri</b>{activeN > 0 && <em className="mp-count">{activeN}</em>}{busy && <span className="mp-busy" />}
+            <span className="grow" />{activeN > 0 && <button className="mp-reset" onClick={clearAll} title="Barcha filtrlarni tozalash"><FilterX size={14} />Tozalash</button>}
+            <button className="icon-btn" onClick={() => setPanel(false)} title="Yopish" aria-label="Filtrni yopish"><X size={17} /></button></div>
           <div className="searchbar sm"><Search size={16} />
             <input placeholder="Hisoblagich №, hisob raqam, abonent, TP…" value={q} onChange={(e) => setQ(e.target.value)} />
             {q && <button className="icon-btn" onClick={() => setQ('')}><X size={15} /></button>}</div>

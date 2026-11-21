@@ -1,11 +1,17 @@
-import { useState } from 'react'
-import { LogIn, User, Lock, Eye, EyeOff, Zap, Send, KeyRound, ShieldCheck } from 'lucide-react'
-import { api } from '../api'
+import { useEffect, useState } from 'react'
+import { LogIn, User, Lock, Eye, EyeOff, Zap, Send, KeyRound, ShieldCheck, Ban } from 'lucide-react'
+import { api, deviceId } from '../api'
 import { useAuth } from '../auth'
 import { Logo } from '../ui'
 import EnergyBackground from '../bg'
 
-function Forgot({ onBack }) {
+function BotBtn({ bot }) {
+  return bot
+    ? <a className="btn tg-link" href={`https://t.me/${bot}`} target="_blank" rel="noreferrer"><Send size={16} />Telegram botga o'tish</a>
+    : <span className="btn tg-link disabled" title="Bot hali ulanmagan"><Send size={16} />Telegram botga o'tish</span>
+}
+
+function Forgot({ onBack, bot }) {
   const [step, setStep] = useState(1)
   const [u, setU] = useState('')
   const [code, setCode] = useState('')
@@ -30,7 +36,8 @@ function Forgot({ onBack }) {
       <button className="btn primary big" disabled={busy || !u || (step === 2 && (code.length < 6 || pw.length < 6))}>
         {step === 1 ? <><Send size={18} />Kod yuborish</> : <><KeyRound size={18} />Parolni almashtirish</>}</button>
       {step === 2 && <button type="button" className="link-btn" onClick={sendCode} disabled={busy}>Kodni qayta yuborish</button>}
-      <button type="button" className="link-btn" onClick={onBack}>← Kirish sahifasiga qaytish</button>
+      <BotBtn bot={bot} />
+      <button type="button" className="btn back-btn" onClick={onBack}>← Kirish sahifasiga qaytish</button>
       <p className="login-hint">Botdan foydalanish: Telegram'da botga <b>/start</b> bosing, chat ID'ni profilingizga kiriting. Bot orqali <b>/parol</b> yuborib ham yangi parol olish mumkin.</p>
     </form>)
 }
@@ -43,14 +50,20 @@ export default function Login() {
   const [show, setShow] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [bot, setBot] = useState('')
+  const [blocked, setBlocked] = useState('')
+  useEffect(() => {
+    try { const m = sessionStorage.getItem('askue_msg'); if (m) { setErr(m); sessionStorage.removeItem('askue_msg') } } catch { /* */ }
+    api.post('/auth/ping', { device_id: deviceId() }).then((r) => { setBot(r.bot_username || ''); if (r.blocked) setBlocked(r.message) }).catch(() => {})
+  }, [])
   const submit = async (e) => {
     e.preventDefault(); setErr(''); setBusy(true)
-    try { await login(u.trim(), p) } catch (x) { setErr(x.message) } finally { setBusy(false) }
+    try { await login(u.trim(), p) } catch (x) { setErr(x.message); if (/bloklangan/i.test(x.message)) setBlocked(x.message) } finally { setBusy(false) }
   }
   return (
     <div className="login-wrap">
       <EnergyBackground intensity={1.25} />
-      {forgot ? <Forgot onBack={() => setForgot(false)} /> : (
+      {forgot ? <Forgot onBack={() => setForgot(false)} bot={bot} /> : (
       <form className="login-card" onSubmit={submit}>
         <div className="login-logo"><Logo theme="dark" height={78} /></div>
         <div className="login-title"><Zap size={18} /><span>ASKUE ma'lumot</span></div>
@@ -60,10 +73,12 @@ export default function Login() {
           <input placeholder="Parol" type={show ? 'text' : 'password'} value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />
           <button type="button" className="eye" onClick={() => setShow(!show)} tabIndex={-1}>{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
         </label>
-        {err && <div className="login-err">{err}</div>}
-        <button className="btn primary big" disabled={busy || !u || !p}><LogIn size={18} />{busy ? 'Kirilmoqda…' : 'Kirish'}</button>
+        {blocked ? <div className="login-block"><Ban size={20} /><div><b>Qurilma bloklangan</b><span>{blocked}</span></div></div>
+          : err && <div className="login-err">{err}</div>}
+        <button className="btn primary big" disabled={busy || !u || !p || !!blocked}><LogIn size={18} />{busy ? 'Kirilmoqda…' : 'Kirish'}</button>
         <button type="button" className="link-btn" onClick={() => setForgot(true)}>Parolni unutdingizmi?</button>
       </form>)}
+    <div className="login-foot">© {new Date().getFullYear()} • «CodeStart» MChJ tomonidan ishlab chiqilgan</div>
     </div>
   )
 }

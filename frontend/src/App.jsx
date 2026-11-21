@@ -13,6 +13,7 @@ const Home = lazy(() => import('./pages/Home'))
 const Messages = lazy(() => import('./pages/Messages'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Brigades = lazy(() => import('./pages/Brigades'))
+const Devices = lazy(() => import('./pages/Devices'))
 const Upload = lazy(() => import('./pages/Upload'))
 const Users = lazy(() => import('./pages/Users'))
 const Audit = lazy(() => import('./pages/Audit'))
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/brigadalar" element={<Guard perm="brigade.view"><Brigades /></Guard>} />
           <Route path="/yuklash" element={<Guard any={['data.upload', 'republic.upload']}><Upload /></Guard>} />
           <Route path="/xodimlar" element={<Guard sadmin><Users /></Guard>} />
+          <Route path="/qurilmalar" element={<Guard sadmin><Devices /></Guard>} />
           <Route path="/jurnal" element={<Guard perm="audit.view"><Audit /></Guard>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

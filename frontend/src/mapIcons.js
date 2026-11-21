@@ -49,9 +49,9 @@ export function pinIcon(kind, color, { big = false, focus = false, bad = false, 
       <svg viewBox="0 0 32 42" width="${w}" height="${h}">
         <ellipse cx="16" cy="40" rx="6" ry="2" fill="rgba(0,0,0,.28)"/>
         <path d="M16 40C16 40 3 26 3 15a13 13 0 0 1 26 0c0 11-13 25-13 25z" fill="${color}" stroke="${ring}" stroke-width="${kind === 'tr' ? 2.6 : 2}"/>
-        ${kind === 'tr' ? '<circle cx="16" cy="15" r="9.8" fill="#0b2a6b"/>' : '<circle cx="16" cy="15" r="9.4" fill="rgba(0,0,0,.16)"/>'}
+        ${kind === 'tr' ? '<circle cx="16" cy="15" r="9.8" fill="#0b2a6b"/>' : '<circle cx="16" cy="15" r="9.6" fill="#ffffff"/>'}
       </svg>
-      <span class="pin-g" style="top:${big ? 9 : 6}px">${glyph(kind, big ? 20 : 17)}</span>
+      <span class="pin-g" style="top:${big ? 9 : 6}px">${glyph(kind, big ? 20 : 17, kind === 'tr' ? '#fff' : color)}</span>
       ${direct ? `<span class="pin-dir" title="Peremichka">${glyph('bolt', 10)}</span>` : ''}
     </div>`
   return L.divIcon({ html, className: 'pin-wrap', iconSize: [w, h], iconAnchor: [w / 2, h - 2], tooltipAnchor: [0, -h + 8] })
@@ -59,16 +59,20 @@ export function pinIcon(kind, color, { big = false, focus = false, bad = false, 
 
 const compact = (n) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace('.0', '')}k` : String(n))
 export function clusterIcon(c, color) {
-  const size = Math.round(Math.min(64, 30 + Math.log10(c.n + 1) * 9) * (c.t === 't' ? 0.82 : 1))
-  let cls = 'cl-tr'
-  if (c.t === 'm') {
-    const r = c.n ? c.bad / c.n : 0
-    cls = r > 0.4 ? 'cl-bad' : r > 0.12 ? 'cl-warn' : 'cl-ok'
+  const isTr = c.t === 't'
+  const size = Math.round(Math.min(62, 34 + Math.log10(c.n + 1) * 8) * (isTr ? 0.86 : 1))
+  if (isTr) {
+    // konsentrator guruhi: yumaloq kvadrat (hisoblagich doiralaridan farqlansin), biroz o'ngga-yuqoriga siljitilgan
+    const off = 16
+    return L.divIcon({
+      html: `<div class="cl cl-t" style="width:${size}px;height:${size}px"><i>${glyph('tr', 13)}</i><b>${compact(c.n)}</b></div>`,
+      className: 'cluster-wrap', iconSize: [size, size], iconAnchor: [size / 2 - off, size / 2 + off],
+    })
   }
-  if (color) cls = 'cl-custom'
-  const ico = c.t === 't' ? `<i>${glyph('tr', 12)}</i>` : ''
+  const bad = c.n ? Math.round((c.bad / c.n) * 100) : 0
+  const ring = color ? `${color} 0 100%` : bad >= 100 ? '#e11d2e 0 100%' : bad <= 0 ? '#16a34a 0 100%' : `#e11d2e 0 ${bad}%, #16a34a ${bad}% 100%`
   return L.divIcon({
-    html: `<div class="cluster ${cls}" style="width:${size}px;height:${size}px${color ? `;--cc:${color}` : ''}"><b>${ico}${compact(c.n)}</b></div>`,
+    html: `<div class="cl cl-m" style="width:${size}px;height:${size}px;background:conic-gradient(from 0deg,${ring})"><span class="cl-in"><b>${compact(c.n)}</b></span></div>`,
     className: 'cluster-wrap', iconSize: [size, size],
   })
 }

@@ -11,10 +11,11 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user, log
 from ..config import settings
-from ..models import PwReset, User
+from ..models import Device, Kv, PwReset, User, UserSession
+from ..services.devices import BLOCKED_MSG, client_ip, touch_device
 from ..services import telegram as tg
 from ..perms import PERM_CODES
-from ..security import (clear_fails, hash_password, make_token, register_fail, too_many_attempts,
+from ..security import (clear_fails, hash_password, make_token, read_token, register_fail, too_many_attempts,
                         verify_password)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -29,6 +30,20 @@ def user_out(u: User) -> dict:
 class LoginIn(BaseModel):
     username: str
     password: str
+    device_id: str | None = None
+
+
+class PingIn(BaseModel):
+    device_id: str | None = None
+
+
+@router.post("/ping")
+def ping(body: PingIn, request: Request, db: Session = Depends(get_db)):
+    """Ilova ochilganda qurilmani ro'yxatga oladi va bloklanganini bildiradi."""
+    d = touch_device(db, request, body.device_id)
+    db.commit()
+    bot = db.scalar(select(Kv.v).where(Kv.k == "tg_bot_username")) or ""
+    return {"blocked": d.is_blocked, "message": BLOCKED_MSG if d.is_blocked else "", "bot_username": bot}
 
 
 @router.post("/login")
@@ -36,14 +51,45 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     key = f"{request.client.host if request.client else '?'}|{body.username.lower()}"
     if too_many_attempts(key):
         raise HTTPException(429, "Urinishlar ko'p. Bir necha daqiqadan keyin qayta urinib ko'ring")
+    dev = touch_device(db, request, body.device_id)
+    if dev.is_blocked:
+        db.commit()
+        raise HTTPException(403, BLOCKED_MSG)
     u = db.scalar(select(User).where(User.username == body.username.strip()))
     if not u or not u.is_active or not verify_password(body.password, u.password_hash):
         register_fail(key)
+        log(db, body.username.strip()[:64], "kirish_xato", f"Noto'g'ri login yoki parol • {dev.name}")
+        db.commit()
         raise HTTPException(401, "Login yoki parol noto'g'ri")
     clear_fails(key)
     u.last_login = datetime.now()
+    dev.last_user = u.username
+    # bitta login — bitta qurilma: boshqa faol sessiyalar tugatiladi
+    old = db.scalars(select(UserSession).where(UserSession.user_id == u.id, UserSession.revoked.is_(False))).all()
+    kicked = []
+    for o in old:
+        o.revoked = True
+        o.reason = "Hisobingizga boshqa qurilmadan kirildi, shuning uchun bu qurilmadan chiqarildingiz"
+        if o.device_id != dev.id:
+            kicked.append(o.device_id)
+    sid = secrets.token_hex(16)
+    db.add(UserSession(sid=sid, user_id=u.id, username=u.username, device_id=dev.id, ip=client_ip(request)))
+    log(db, u.username, "kirish", f"{dev.name}" + (f" • {len(kicked)} ta boshqa qurilmadan chiqarildi" if kicked else ""))
     db.commit()
-    return {"token": make_token(u.id), "user": user_out(u)}
+    return {"token": make_token(u.id, sid), "user": user_out(u)}
+
+
+@router.post("/logout")
+def logout(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    auth = request.headers.get("authorization", "")
+    tk = read_token(auth[7:]) if auth.lower().startswith("bearer ") else None
+    if tk:
+        ss = db.scalar(select(UserSession).where(UserSession.sid == tk[1]))
+        if ss and not ss.revoked:
+            ss.revoked, ss.reason = True, "Tizimdan chiqildi"
+            log(db, user.username, "chiqish", "")
+            db.commit()
+    return {"ok": True}
 
 
 @router.get("/me")

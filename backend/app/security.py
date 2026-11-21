@@ -20,15 +20,15 @@ def verify_password(p: str, h: str) -> bool:
         return False
 
 
-def make_token(user_id: int) -> str:
+def make_token(user_id: int, sid: str) -> str:
     exp = datetime.now(timezone.utc) + timedelta(hours=settings.token_hours)
-    return jwt.encode({"sub": str(user_id), "exp": exp}, settings.secret_key, algorithm=ALG)
+    return jwt.encode({"sub": str(user_id), "sid": sid, "exp": exp}, settings.secret_key, algorithm=ALG)
 
 
-def read_token(token: str) -> int | None:
+def read_token(token: str) -> tuple[int, str] | None:
     try:
         data = jwt.decode(token, settings.secret_key, algorithms=[ALG])
-        return int(data["sub"])
+        return int(data["sub"]), str(data.get("sid") or "")
     except Exception:
         return None
 

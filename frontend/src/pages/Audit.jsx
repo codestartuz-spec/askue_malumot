@@ -5,7 +5,8 @@ import { Empty, Pager, Spinner } from '../ui'
 import { dt } from '../fmt'
 
 const NAMES = { upload: "Ma'lumot yuklash", brigada_tahrir: 'Brigada tahriri', tp_biriktirish: 'TP biriktirish', "brigada_qo'shildi": "Brigada qo'shildi",
-  "xodim_qo'shildi": "Xodim qo'shildi", "xodim_o'zgardi": "Xodim o'zgardi", parol: 'Parol' }
+  "xodim_qo'shildi": "Xodim qo'shildi", "xodim_o'zgardi": "Xodim o'zgardi", parol: 'Parol', kirish: 'Tizimga kirdi', chiqish: 'Tizimdan chiqdi',
+  kirish_xato: 'Kirish xatosi', qurilma_blok: 'Qurilma bloklandi', qurilma_ochildi: 'Qurilma ochildi', qurilma_chiqarish: 'Qurilmadan chiqarildi' }
 
 export default function Audit() {
   const [page, setPage] = useState(1)
@@ -17,8 +18,8 @@ export default function Audit() {
       <div className="card tcard">
         {!d ? <Spinner /> : d.items.length === 0 ? <Empty icon={ScrollText}>Jurnal bo'sh</Empty> : (
           <div className="tbl-scroll"><table className="list">
-            <thead><tr><th>Vaqt</th><th>Foydalanuvchi</th><th>Amal</th><th>Tafsilot</th></tr></thead>
-            <tbody>{d.items.map((r) => <tr key={r.id}><td className="mut nowrap">{dt(r.created_at)}</td><td className="b">{r.username}</td><td><span className="tag">{NAMES[r.action] || r.action}</span></td><td className="wrap">{r.detail}</td></tr>)}</tbody>
+            <thead><tr><th>Vaqt</th><th>Foydalanuvchi</th><th>Amal</th><th>IP manzil</th><th>Tafsilot</th></tr></thead>
+            <tbody>{d.items.map((r) => <tr key={r.id}><td className="mut nowrap">{dt(r.created_at)}</td><td className="b">{r.username}</td><td><span className="tag">{NAMES[r.action] || r.action}</span></td><td className="mono nowrap">{r.ip || '—'}</td><td className="wrap">{r.detail}</td></tr>)}</tbody>
           </table></div>)}
         {d && <div className="pager-wrap"><Pager page={page} size={50} total={d.total} onPage={setPage} /></div>}
       </div>

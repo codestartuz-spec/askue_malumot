@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, createContext, useContext, useCallback } from 'react'
-import { Users, X, Loader2, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, X, Loader2, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Megaphone, Trash2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import P from './logoPaths'
 
@@ -122,4 +122,32 @@ export function Members({ c }) {
   const n = c.members
   return <span className="members" title={c.members_at ? `A'zolar soni (yangilangan: ${new Date(c.members_at).toLocaleString('ru-RU')})` : "A'zolar soni hali aniqlanmagan"}>
     <Users size={13} />{n === null || n === undefined ? '—' : n.toLocaleString('ru-RU')}</span>
+}
+
+
+// Kanal va guruhlar ro'yxati — jadval ko'rinishida (bir qatorda bitta guruh).
+// sel/onToggle/onAll berilsa — tanlash ustuni chiqadi; full=true — Sozlamalar uchun to'liq ustunlar.
+export function ChatTable({ chats, sel, onToggle, onAll, busy, full, onDel, canDel }) {
+  const pick = !!sel
+  const all = pick && chats.length > 0 && chats.every((c) => sel.has(c.id))
+  return (
+    <div className="chat-table-wrap"><table className="list chat-table">
+      <thead><tr>
+        {pick && <th className="ck"><input type="checkbox" checked={all} onChange={(e) => onAll(e.target.checked)} disabled={busy} aria-label="Hammasini tanlash" /></th>}
+        <th>Kanal / guruh</th>{!full && <th>Turi</th>}<th className="num">A'zolar</th>
+        {full && <><th>Holat</th><th /></>}
+      </tr></thead>
+      <tbody>{chats.map((c) => (
+        <tr key={c.id} className={`${pick && sel.has(c.id) ? 'sel' : ''} ${c.is_active === false ? 'off' : ''}`} onClick={pick && !busy ? () => onToggle(c.id) : undefined}>
+          {pick && <td className="ck"><input type="checkbox" checked={sel.has(c.id)} onChange={() => onToggle(c.id)} onClick={(e) => e.stopPropagation()} disabled={busy} /></td>}
+          <td className="b">{c.kind === 'kanal' ? <Megaphone size={15} /> : <Users size={15} />} {c.title}{c.username && <small className="mut"> @{c.username}</small>}
+            {full && <div className="chat-sub mut">{c.kind} • {c.source === 'auto' ? 'avtomatik' : "qo'lda"} • <span className="mono">{c.chat_id}</span></div>}</td>
+          {!full && <td className="mut">{c.kind}</td>}
+          <td className="num"><Members c={c} /></td>
+          {full && <>
+            <td>{c.is_active === false ? <span className="tag red">Bot chiqarilgan</span> : <span className="tag green">Faol</span>}</td>
+            <td className="acts">{canDel && <button className="icon-btn danger" onClick={() => onDel(c)} title="Olib tashlash"><Trash2 size={16} /></button>}</td></>}
+        </tr>))}</tbody>
+    </table></div>
+  )
 }

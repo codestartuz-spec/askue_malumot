@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom'
 import { Globe2, GitCompareArrows, CalendarRange, Download, FileText, FileSpreadsheet, FileDown, Send, ArrowUp, ArrowDown, RefreshCw, UploadCloud, Megaphone, Users, AlertTriangle, CheckCircle2, MailCheck } from 'lucide-react'
 import { api, download, qs } from '../api'
 import { useAuth } from '../auth'
-import { Members, Empty, Modal, Spinner, useToast } from '../ui'
+import { ChatTable, Empty, Modal, Spinner, useToast } from '../ui'
 import { dmy, num } from '../fmt'
 import { Cell } from './DynPage'
-import TgBotLink from '../TgBot'
 
 const Diff = ({ v, bad = true }) => {
   if (v === null || v === undefined || v === 0) return <span className="mut">—</span>
@@ -44,7 +43,7 @@ function SendModal({ a, b, mode, onClose }) {
   }
   return (
     <Modal wide icon={Send} title="Respublika dinamikasini Telegram'ga yuborish" onClose={busy ? () => {} : onClose}
-      footer={<><div className="foot-info">{fmts.size} ta fayl{sel.size ? ` → ${sel.size} ta kanal` : ''}</div><TgBotLink label="Telegram botga o'tish" />
+      footer={<><div className="foot-info">{fmts.size} ta fayl{sel.size ? ` → ${sel.size} ta kanal` : ''}</div>
         <button className="btn ghost" onClick={onClose} disabled={busy}>Yopish</button>
         <button className="btn primary" disabled={busy || !fmts.size || !sel.size} onClick={go}><Send size={16} />Yuborish</button></>}>
       <div className="send-grid">
@@ -61,9 +60,7 @@ function SendModal({ a, b, mode, onClose }) {
           {!chats ? <Spinner /> : chats.length === 0 ? (
             <div className="empty sm"><Megaphone size={30} /><div>Hali kanal yoki guruh qo'shilmagan.{can('settings.manage') ? <> <Link to="/sozlamalar" onClick={onClose}>Sozlamalar</Link> bo'limidan qo'shing.</> : " Sadmin'ga murojaat qiling."}</div></div>
           ) : (
-            <div className="chat-list">{chats.map((c) => (
-              <label key={c.id} className={`chat ${sel.has(c.id) ? 'on' : ''}`}><input type="checkbox" checked={sel.has(c.id)} onChange={() => tg(setSel, c.id)} disabled={busy} />
-                <i>{c.kind === 'kanal' ? <Megaphone size={18} /> : <Users size={18} />}</i><span><b>{c.title} <Members c={c} /></b><small>{c.kind}{c.username ? ` • @${c.username}` : ''}</small></span></label>))}</div>)}
+            <ChatTable chats={chats} sel={sel} busy={busy} onToggle={(id) => tg(setSel, id)} onAll={(v) => setSel(v ? new Set(chats.map((c) => c.id)) : new Set())} />)}
         </div>
       </div>
       <label className={`ack-opt ${ack ? 'on' : ''}`}><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} disabled={busy} />
@@ -131,7 +128,6 @@ export default function Republic() {
             <button className="btn ghost" disabled={!!busy} onClick={() => dl('pdf')}><FileText size={16} />PDF</button>
             <button className="btn ghost" disabled={!!busy} onClick={() => dl('xlsx')}><FileSpreadsheet size={16} />Excel</button>
             <button className="btn ghost" hidden={!can('republic.original')} disabled={!!busy} title="Respublika markazi yuborgan asl PDF fayl" onClick={() => dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
-          {can('telegram.send') && data && <TgBotLink label="Telegram bot" />}
           {can('telegram.send') && data && <button className="btn primary" onClick={() => setSend(true)}><Send size={16} />Telegramga yuborish</button>}
         </div>
       </div>
