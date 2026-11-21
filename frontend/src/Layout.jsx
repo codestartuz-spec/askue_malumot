@@ -97,7 +97,7 @@ export default function Layout({ children }) {
             : <NavLink key={n.to} to={n.to} end={n.end} className="nav-item"><n.icon size={19} /><span>{n.label}</span></NavLink>)}
         </nav>
         <div className="side-foot">
-          <div className="foot-line"><span className="pulse-dot" />Qashqadaryo hududiy filiali</div>
+          <div className="foot-line"><span className="pulse-dot" />{boot?.region_name || ''}</div>
         </div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}

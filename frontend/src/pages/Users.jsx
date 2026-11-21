@@ -5,19 +5,10 @@ import { useAuth } from '../auth'
 import { Modal, Spinner, useToast } from '../ui'
 import { dt } from '../fmt'
 
-// Tayyor ruxsat to'plamlari (tez belgilash uchun)
-const PRESETS = [
-  { name: 'Kuzatuvchi', hint: 'Faqat jadvallarni ko\'radi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'ag.view'] },
-  { name: 'Operator', hint: "Jadval, xarita, ro'yxat va Excel/PDF", codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'map.view', 'drill.view', 'export', 'dynamics.compare', 'report.download', 'republic.original', 'ag.view', 'ag.original'] },
-  { name: 'Brigadir', hint: 'Brigadalar va xarita', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'map.view', 'brigade.view', 'brigade.edit', 'brigade.assign', 'drill.view', 'export'] },
-  { name: "Ma'lumot kiritish", hint: 'Fayl yuklaydi va o\'chiradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'data.upload', 'republic.upload', 'data.delete', 'republic.original', 'ag.view', 'ag.upload', 'ag.original'] },
-  { name: 'Telegram operatori', hint: 'Hisobot va xabar yuboradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'ag.view', 'report.download', 'telegram.send', 'telegram.message', 'telegram.journal'] },
-]
-
 const initials = (u) => (u.full_name || u.username || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 const hue = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7)
 
-function PermEditor({ catalog, value, onChange }) {
+function PermEditor({ catalog, presets, value, onChange }) {
   const groups = useMemo(() => [...new Set(catalog.map((p) => p.group))], [catalog])
   const [open, setOpen] = useState(() => new Set(groups))
   const set = new Set(value)
@@ -49,7 +40,7 @@ function PermEditor({ catalog, value, onChange }) {
       <div className="perm-title"><ShieldCheck size={17} />Ruxsatlar <span className="perm-count">{value.length} / {catalog.length}</span></div>
       <div className="presets">
         <span><Wand2 size={14} />Tez belgilash:</span>
-        {PRESETS.map((p) => <button key={p.name} className="chip" title={p.hint} onClick={() => preset(p.codes)}>{p.name}</button>)}
+        {presets.map((p) => <button key={p.name} className="chip" title={p.hint} onClick={() => preset(p.codes)}>{p.name}</button>)}
         <button className="chip" onClick={() => preset(catalog.map((p) => p.code))}>Hammasi</button>
         <button className="chip danger" onClick={() => preset([])}><X size={12} />Tozalash</button>
       </div>
@@ -76,7 +67,7 @@ function PermEditor({ catalog, value, onChange }) {
   )
 }
 
-function UserModal({ u, catalog, onClose, onSaved }) {
+function UserModal({ u, catalog, presets, onClose, onSaved }) {
   const toast = useToast()
   const isNew = !u
   const [starters, setStarters] = useState([])
@@ -103,7 +94,7 @@ function UserModal({ u, catalog, onClose, onSaved }) {
         <label className="field"><span><KeyRound size={14} />{isNew ? 'Parol' : 'Yangi parol (ixtiyoriy)'}</span><input type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="new-password" /></label>
       </div>
       {u?.is_super ? <small className="hint">Sadmin barcha ruxsatlarga ega — ularni o'zgartirib bo'lmaydi.</small> : (<>
-        <PermEditor catalog={catalog} value={f.perms} onChange={(perms) => setF({ ...f, perms })} /></>)}
+        <PermEditor catalog={catalog} presets={presets} value={f.perms} onChange={(perms) => setF({ ...f, perms })} /></>)}
       <small className="hint">Bog'liq ruxsatlar avtomatik belgilanadi (masalan, brigadani tahrirlash uchun «Brigadalar sahifasi» kerak). Ruxsat berilmasa — sahifa menyuda ko'rinmaydi va server ham so'rovni rad etadi.</small>
     </Modal>
   )
@@ -205,7 +196,7 @@ export default function Users() {
       </div>
       {!list ? <Spinner /> : shown.length === 0 ? <div className="card pad mut">Xodim topilmadi.</div> : (
         <div className="ucards">{shown.map((u) => <UserCard key={u.id} u={u} catalog={boot.perms} onEdit={setEdit} onToggle={toggle} onDelete={setDel} />)}</div>)}
-      {edit !== undefined && <UserModal u={edit} catalog={boot.perms} onClose={() => setEdit(undefined)} onSaved={load} />}
+      {edit !== undefined && <UserModal u={edit} catalog={boot.perms} presets={boot.presets || []} onClose={() => setEdit(undefined)} onSaved={load} />}
       {del && <DeleteModal u={del} onClose={() => setDel(null)} onDone={load} />}
     </div>
   )

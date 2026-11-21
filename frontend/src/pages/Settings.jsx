@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Bot, Megaphone, Users, Plus, Trash2, Send, PlugZap, Unplug, KeyRound, BookOpen, RefreshCw, ShieldAlert, Settings2, Activity, DatabaseBackup } from 'lucide-react'
+import { Bot, Megaphone, Users, Plus, Trash2, Send, PlugZap, Unplug, KeyRound, BookOpen, RefreshCw, ShieldAlert, Settings2, Activity, DatabaseBackup, SlidersHorizontal } from 'lucide-react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { ChatTable, Confirm, Spinner, useToast } from '../ui'
 import TgBotLink from '../TgBot'
 import SystemStatus from './SystemStatus'
 import Backup from './Backup'
+import AppSettings from './AppSettings'
 
 export default function Settings() {
   const { user, can, reload } = useAuth()
@@ -22,6 +23,7 @@ export default function Settings() {
 
   const TABS = [
     can('settings.manage') && { k: 'bot', label: 'Bot va guruh sozlamalari', icon: Settings2 },
+    can('settings.manage') && { k: 'umumiy', label: 'Umumiy sozlamalar', icon: SlidersHorizontal },
     can('system.view') && { k: 'tizim', label: 'Tizim va server holati', icon: Activity },
     can('backup.manage') && { k: 'zaxira', label: 'Zaxira nusxa', icon: DatabaseBackup },
   ].filter(Boolean)
@@ -53,6 +55,7 @@ export default function Settings() {
 
       {tab === 'tizim' && <SystemStatus />}
       {tab === 'zaxira' && <Backup />}
+      {tab === 'umumiy' && <AppSettings />}
 
       {tab === 'bot' && (
         <div className="set-halves">

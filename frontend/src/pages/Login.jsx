@@ -52,9 +52,10 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   const [bot, setBot] = useState('')
   const [blocked, setBlocked] = useState('')
+  const [region, setRegion] = useState('')
   useEffect(() => {
     try { const m = sessionStorage.getItem('askue_msg'); if (m) { setErr(m); sessionStorage.removeItem('askue_msg') } } catch { /* */ }
-    api.post('/auth/ping', { device_id: deviceId() }).then((r) => { setBot(r.bot_username || ''); if (r.blocked) setBlocked(r.message) }).catch(() => {})
+    api.post('/auth/ping', { device_id: deviceId() }).then((r) => { setBot(r.bot_username || ''); setRegion(r.region_name || ''); if (r.blocked) setBlocked(r.message) }).catch(() => {})
   }, [])
   const submit = async (e) => {
     e.preventDefault(); setErr(''); setBusy(true)
@@ -67,7 +68,7 @@ export default function Login() {
       <form className="login-card" onSubmit={submit}>
         <div className="login-logo"><Logo theme="dark" height={78} /></div>
         <div className="login-title"><Zap size={18} /><span>ASKUE ma'lumot</span></div>
-        <p className="login-sub">Qashqadaryo hududiy filiali</p>
+        <p className="login-sub">{region}</p>
         <label className="input-ic"><User size={18} /><input autoFocus placeholder="Login" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" /></label>
         <label className="input-ic"><Lock size={18} />
           <input placeholder="Parol" type={show ? 'text' : 'password'} value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" />

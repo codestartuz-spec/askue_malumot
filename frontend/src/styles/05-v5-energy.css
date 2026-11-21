@@ -1,0 +1,62 @@
+/* =====================================================================
+   v5 — ASKUE / ENERGETIKA: qizil – oq – ko'k ranglar + animatsion fon
+   (konsentratorlar, hisoblagichlar, aloqa paketlari, qayta ulanish)
+   ===================================================================== */
+:root{
+  --blue-d:#0a2a66; --blue:#1450c8; --blue-l:#e6eefc;
+  --red:#d71920; --red-d:#a8121a; --red-l:#fdeaea;
+  --gov:#0a2a66; --gov2:#1450c8; --gold:#d71920; --brand:#1450c8;
+  --bg:#f3f6fc; --line:#d5deee; --ink:#0c1a3a; --mut:#53627f;
+}
+html,body{background:#f3f6fc}
+.energy-bg,canvas.energy-bg{display:block;position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 100% 0%,rgba(215,25,32,.07),transparent 60%),
+    radial-gradient(1000px 560px at 0% 100%,rgba(20,80,200,.10),transparent 60%),
+    linear-gradient(180deg,#f7f9fe,#eef3fb)}
+/* eng tepada: qizil-oq-ko'k chiziq */
+body::after{background:linear-gradient(90deg,var(--red) 0 33.3%,#fff 33.3% 66.6%,var(--blue) 66.6% 100%);height:4px;box-shadow:0 1px 0 rgba(10,42,102,.15)}
+
+/* yon panel: chuqur ko'k, faol band qizil */
+.side{background:linear-gradient(180deg,#0b2f73 0%,#0a2559 100%);border-right:1px solid #071c44}
+.nav-item.active{background:rgba(255,255,255,.12);border-left-color:var(--red)}
+.nav-item.active svg{color:#ff6b70}
+.side-brand .logo{filter:drop-shadow(0 0 0 transparent)}
+
+/* yuqori panel va sarlavhalar */
+.top{background:rgba(255,255,255,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+.top-title,.ttl{color:var(--blue-d)}
+.head-card{border-left-color:var(--red);background:rgba(255,255,255,.96)}
+.dinamika{color:var(--red);animation:none}
+.sec-title,.mp-sec{color:var(--blue-d);border-bottom-color:var(--red)}
+.tab.on{color:var(--blue-d);border-bottom-color:var(--red)}
+.tab.on svg{color:var(--red)}
+.tab:hover{background:var(--blue-l);color:var(--blue-d)}
+.seg button.on,.mp-tabs button.on{background:var(--blue)}
+
+/* tugmalar: asosiy — ko'k, xavfli — qizil */
+.btn.primary{background:var(--blue);border-color:var(--blue)}
+.btn.primary:hover:not(:disabled){background:var(--blue-d)}
+.btn.danger,.btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger:hover,.btn.red:hover{background:var(--red-d)}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);outline-color:rgba(20,80,200,.35)}
+
+/* jadvallar */
+.list th,.dyn-table thead th{background:var(--blue-d);border-color:#1c3f86}
+.list tbody tr:hover{background:var(--blue-l)}
+.dyn-table tr.total td{background:#fde9ea;color:#6b0d12}
+
+/* kartalar (fon animatsiyasi chetlarda ko'rinadi) */
+.card,.ucard,.kpi,.map-panel{background:rgba(255,255,255,.97)}
+.kpi-ic{background:var(--blue-l);color:var(--blue)}
+.kpi-b b{color:var(--blue-d)}
+.perm-count,.members{background:var(--blue-l);color:var(--blue)}
+
+/* kirish: shaffofroq oq karta, qizil yuqori chiziq */
+.login-card{background:rgba(255,255,255,.94);border-top-color:var(--red);backdrop-filter:blur(3px)}
+.login-title{color:var(--blue-d)}
+.login-card .btn.primary:disabled{background:#8da6d6}
+.login-card a,.login-card .lnk{color:var(--blue)}
+.input-ic:focus-within{border-color:var(--blue);box-shadow:0 0 0 2px rgba(20,80,200,.2)}
+.boot{color:var(--blue-d)}
+

@@ -1,0 +1,11 @@
+/* ===== v10: audit jurnali filtrlari, umumiy sozlamalar ===== */
+.aud-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;margin-bottom:12px}
+.aud-filters select,.aud-filters input[type=date],.aud-filters .aud-ip{height:36px;border:1px solid #cfd8e6;border-radius:8px;padding:0 10px;background:#fff;font:inherit;font-size:13.5px;color:#1c2b45}
+.aud-filters .aud-ip{width:130px}
+.aud-search{flex:1 1 240px;display:flex;align-items:center;gap:8px;height:36px;border:1px solid #cfd8e6;border-radius:8px;padding:0 10px;background:#fff;color:#5f6f86}
+.aud-search input{flex:1;border:0;outline:0;font:inherit;font-size:13.5px;background:transparent;color:#1c2b45;min-width:0}
+.aud-exp{margin-left:auto;display:flex;gap:6px}
+.aud-filters .btn{height:36px}
+.pager-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.set-group{margin:6px 0 14px}
+.set-group h4{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#5f6f86}

@@ -1,0 +1,32 @@
+/* =====================================================================
+   v8 — jadval: asl PDF dinamikasidek (och ko'k sarlavha, sariq «Jami», ingichka qora chiziq)
+   ===================================================================== */
+.dyn-table{--ln:#2b2f36;font-family:Calibri,Carlito,Inter,Arial,sans-serif}
+.dyn-table th,.list.dyn-table th{background:#ddebf7!important;color:#000!important;border-color:var(--ln)!important;font-size:12px}
+.dyn-table thead tr:first-child th{border-top:1px solid var(--ln)!important;font-size:13px}
+.dyn-table thead th:first-child{border-left:1px solid var(--ln)!important}
+.dyn-table td{border-color:var(--ln)!important;height:27px;padding:3px 7px;font-weight:700}
+.dyn-table td:first-child{border-left:1px solid var(--ln)!important}
+.dyn-table .h-green{color:#00b050!important}.dyn-table .h-red{color:#c00000!important}.dyn-table .h-blue{color:#4472c4!important}
+.dyn-table .h-amber{color:#c55a11!important}.dyn-table .h-purple{color:#7030a0!important}
+.dyn-table .h-sub{color:#000!important}
+.dyn-table .h-arr{background:none!important;color:transparent!important;-webkit-background-clip:border-box;background-clip:border-box}
+.dyn-table .h-arr span{display:inline-block;font-size:0}
+.dyn-table .h-arr span::before{content:"↑ ";color:#0066ff;font-size:14px;font-weight:700}
+.dyn-table .h-arr span::after{content:"↓";color:#ff0000;font-size:14px;font-weight:700}
+.dyn-table .c-green{color:#00b050}.dyn-table .c-red{color:#c00000}.dyn-table .c-amber{color:#c55a11}.dyn-table .c-purple{color:#7030a0}
+.dyn-table td.cream{background:#fffdef}
+.dyn-table td.c-d{text-align:right;padding:3px 5px!important}
+.delta{gap:3px;font-size:10.5px;font-weight:700}.delta b{font-size:14px;font-weight:700;line-height:1}
+.delta.red{color:#ff0000}.delta.blue{color:#0000ff}.delta.green{color:#00c853}
+.pdfd{font-weight:700}.pdfd.up{color:#ff0000}.pdfd.dn{color:#0000ff}
+.dyn-table tr.total td{background:#ffe699!important;color:#000;border-top:1px solid var(--ln)!important}
+.dyn-table tr.total td.name{background:#ffe699!important;text-align:center;font-size:15px}
+.dyn-table tr.total td.cream{background:#ffe699!important}
+.dyn-table tr.total .c-green{color:#00b050}.dyn-table tr.total .c-red{color:#c00000}
+.dyn-table tbody tr:hover td{background:#eef5ff}
+.dyn-table tbody tr:hover td.cream{background:#fff6cc}
+.dyn-table td.name{font-weight:500}
+.dyn-table td.name button{color:#000;font-weight:500}
+.dyn-table td.name.link button:hover{color:#1450c8}
+

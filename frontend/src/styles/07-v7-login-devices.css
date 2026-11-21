@@ -1,0 +1,40 @@
+/* =====================================================================
+   v7 — kirish sahifasi, menyu, qurilmalar
+   ===================================================================== */
+.login-card .link-btn{color:#1450c8;font-weight:700;background:none;padding:6px 4px;border-radius:4px}
+.login-card .link-btn:hover,.login-card .link-btn:focus{color:#0a2a66;background:#e3ecfc;text-decoration:underline}
+.login-card .btn.tg-link{display:flex;align-items:center;justify-content:center;gap:8px;background:#229ed9;color:#fff;border:0;font-weight:700;text-decoration:none;padding:11px 14px}
+.login-card .btn.tg-link:hover{background:#1b87b9;color:#fff}
+.login-card .btn.tg-link.disabled{background:#9fb0c8;pointer-events:none}
+.login-card .btn.back-btn{background:#fff;color:#0a2a66;border:1px solid #b9c5d8;font-weight:700;justify-content:center}
+.login-card .btn.back-btn:hover{background:#eef3fc;color:#0a2a66}
+.login-block{display:flex;gap:10px;align-items:flex-start;background:#fdecea;border:1px solid #f1b5b0;color:#8a1c14;border-radius:6px;padding:10px 12px}
+.login-block svg{flex:none;margin-top:1px}.login-block b{display:block}.login-block span{font-size:13px}
+.login-ok{background:#e6f6ec;border:1px solid #a9dcb9;color:#14602c;padding:9px 12px;border-radius:6px}
+.content{max-width:none}
+.main{min-width:0;width:auto}
+.shell.collapsed .main{margin-left:0;width:100%}
+
+/* qurilmalar */
+.dev-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.dev-stats .card{display:flex;flex-direction:column;gap:2px;border-left:4px solid var(--blue)}
+.dev-stats b{font-size:26px;color:var(--blue-d)}.dev-stats span{color:var(--mut);font-size:12.5px}
+.dev-stats .on{border-left-color:#1e9a4d}.dev-stats .bl{border-left-color:var(--red)}
+.dev-bar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.dev-q{flex:1;min-width:220px;padding:9px 12px;border:1px solid #b9c5d8;border-radius:6px}
+.dev-table td{vertical-align:middle}
+.dev-name{display:flex;gap:10px;align-items:center}.dev-name svg{color:var(--blue);flex:none}
+.dev-name small{display:block;font-size:11.5px}
+.dev-users{display:flex;flex-wrap:wrap;gap:5px}
+.dev-u{display:inline-flex;align-items:center;gap:4px;background:#eef3fc;color:var(--blue-d);border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600}
+.dev-u.act{background:#e3f6ea;color:#14602c}.dev-u i{font-style:normal;font-weight:700}
+.dev-table tr.blk td{background:#fff5f5}
+.dev-table .db{display:block;font-size:11px;margin-top:3px}
+.tag.red{background:#fdecea;color:#8a1c14}.tag.green{background:#e3f6ea;color:#14602c}.tag.off{background:#eef1f6;color:#6b7c95}
+.btn.sm{padding:5px 10px;font-size:12.5px;display:inline-flex;align-items:center;gap:5px}
+.btn.sm.danger{background:#fff;color:var(--red-d);border:1px solid #f1b5b0}.btn.sm.danger:hover{background:var(--red-l)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+@media(max-width:700px){.dev-stats{grid-template-columns:1fr}}
+.dev-table td.acts{vertical-align:middle;text-align:right}
+.dev-table td.mono svg{vertical-align:-1px;color:var(--mut)}
+

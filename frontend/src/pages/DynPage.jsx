@@ -133,7 +133,7 @@ export default function DynPage({ table, esp, setEsp, from, setFrom, to, setTo, 
     return () => ac.abort()
   }, [table, esp, from, to, tick])
 
-  const espName = data?.esp?.label || 'Qashqadaryo hududiy filiali'
+  const espName = data?.esp?.label || boot?.region_name || ''
   const dates = data?.dates || []
   const byBrigade = !!esp
   const rows = data?.rows || []
@@ -145,7 +145,7 @@ export default function DynPage({ table, esp, setEsp, from, setFrom, to, setTo, 
       kind: cfg.drill, metric: col.m,
       espId: byBrigade ? Number(esp) : (isTotal ? undefined : row.id),
       brigadeId: byBrigade && row ? row.id : undefined,
-      scope: byBrigade ? `${espName}${row ? ', ' + row.name : ''}` : (isTotal ? 'Qashqadaryo hududiy filiali' : row.name),
+      scope: byBrigade ? `${espName}${row ? ', ' + row.name : ''}` : (isTotal ? (boot?.region_name || '') : row.name),
     })
   }
   const totalRow = useMemo(() => data?.total ? { cur: data.total.cur, base: data.total.base } : null, [data])

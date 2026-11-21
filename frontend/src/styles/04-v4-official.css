@@ -1,0 +1,101 @@
+/* =====================================================================
+   v4 — DAVLAT TASHKILOTI USLUBI: rasmiy, tinch, tekis (flat)
+   Ranglar: to'q ko'k (asosiy), oq, och kulrang, oltin chiziq (urg'u),
+   holat ranglari faqat ma'no uchun (yashil/sariq/qizil).
+   ===================================================================== */
+:root{
+  --gov:#0b2a4f; --gov2:#12396b; --gov-ink:#0e1b2e; --gold:#b58a2b;
+  --bg:#f2f4f8; --line:#d3dae5; --card:#fff; --ink:#0e1b2e; --mut:#566379;
+  --brand:#12396b; --r:6px; --shadow:0 1px 2px rgba(11,42,79,.08);
+  --ok:#1e7a3c; --warn:#b7791f; --bad:#b3261e;
+}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-size:14.5px}
+/* davlat bayrog'i ranglaridagi ingichka chiziq (eng tepada) */
+body::after{content:"";position:fixed;z-index:200;top:0;left:0;right:0;height:4px;pointer-events:none;
+  background:linear-gradient(90deg,#0099b5 0 33.3%,#fff 33.3% 33.9%,#ce1126 33.9% 34.5%,#fff 34.5% 35.1%,#1eb53a 35.1% 100%)}
+
+/* yon panel: bir xil to'q ko'k, oltin chiziqli faol band */
+.side{background:var(--gov);box-shadow:none;border-right:1px solid #07203d;padding-top:4px}
+.side-brand{border-bottom:1px solid rgba(255,255,255,.12)}
+.nav-item{border-radius:0;color:#cbd7e8;padding:11px 16px;border-left:3px solid transparent;font-weight:600}
+.nav-item:hover{background:rgba(255,255,255,.06)}
+.nav-item.active{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--gold);box-shadow:none}
+.nav-group{color:#8fa5c6;letter-spacing:.08em}
+
+/* yuqori panel */
+.top{background:#fff;border-bottom:1px solid var(--line);box-shadow:none;backdrop-filter:none;padding-top:14px}
+.top-title{color:var(--gov);font-weight:800;font-size:18px}
+.top .chip{background:#f3f6fb;border:1px solid var(--line);color:var(--gov2);border-radius:4px}
+.user-menu{border-radius:6px;box-shadow:0 8px 24px rgba(11,42,79,.16)}
+.avatar{background:var(--gov);color:#fff}
+
+/* kartalar va sarlavhalar */
+.card,.ucard,.map-panel{border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow)}
+.head-card{border-left:4px solid var(--gold);background:#fff}
+.ttl{color:var(--gov);font-size:21px}
+.sub{color:var(--mut)}
+.dinamika{color:var(--gov2);letter-spacing:.18em;font-size:13px}
+.sec-title,.mp-sec{color:var(--gov);border-bottom:2px solid var(--gold);display:inline-block;padding-bottom:3px;margin:26px 2px 12px}
+
+/* tablar: pastki chiziqli, tekis */
+.tabs{background:transparent;border:0;border-bottom:2px solid var(--line);box-shadow:none;border-radius:0;padding:0;gap:2px}
+.tab{border-radius:0;padding:11px 18px;color:#4a5a73;border-bottom:3px solid transparent;margin-bottom:-2px;background:none}
+.tab:hover{background:#e9eef6;color:var(--gov)}
+.tab.on{background:none;color:var(--gov);box-shadow:none;border-bottom-color:var(--gold)}
+.tab.on svg{color:var(--gold)}
+.seg button.on,.mp-tabs button.on{background:var(--gov);color:#fff;box-shadow:none}
+.mp-tabs,.seg{border-radius:4px;background:#e9eef6}
+.mp-tabs button,.seg button{border-radius:3px}
+
+/* tugmalar */
+.btn,button.btn{border-radius:4px;transform:none}
+.btn.primary{background:var(--gov2);box-shadow:none;border-color:var(--gov2)}
+.btn.primary:hover:not(:disabled){background:var(--gov);box-shadow:none}
+.btn.primary,.btn-primary,button.primary{background:var(--gov2);border-color:var(--gov2);color:#fff;box-shadow:none}
+.btn.primary:hover,.btn-primary:hover,button.primary:hover{background:var(--gov)}
+.chip{border-radius:4px}
+input,select,textarea{border-radius:4px}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(18,57,107,.35);outline-offset:0;border-color:var(--gov2)}
+
+/* jadvallar: aniq chiziqlar, rasmiy sarlavha */
+.list th,.dyn-table thead th{background:var(--gov);color:#fff;border-color:#1c4678}
+.list td{border-color:var(--line)}
+.list tbody tr:nth-child(even){background:#f7f9fc}
+.list tbody tr:hover{background:#eaf0f9}
+.dyn-table tr.total td{background:#f3e7c4;color:#3b2d06}
+.perm-count,.members{background:#e8eef8;color:var(--gov2);border-radius:4px}
+
+/* holat ranglari: ma'noga ega, to'yinmagan */
+.st-ok,.badge.ok{color:var(--ok)}.st-warn{color:var(--warn)}.st-bad,.badge.bad{color:var(--bad)}
+
+/* kirish sahifasi: oq karta, chiroyli emas — rasmiy */
+.login-wrap{background:var(--bg)}
+.login-card{background:#fff;color:var(--ink);backdrop-filter:none;border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:6px;box-shadow:0 8px 28px rgba(11,42,79,.12);animation:none}
+.login-title{color:var(--gov);letter-spacing:.04em}
+.login-sub,.login-hint{color:var(--mut)}.login-hint b{color:var(--gov)}
+.login-card input{background:#fff;color:var(--ink);border:1px solid #b9c5d8}
+.login-card .field svg,.login-card .ico{color:#6b7c95}
+.login-err{background:#fdecea;border-color:#f1b5b0;color:#8a1c14}
+.login-ok{background:#e8f5ec;border-color:#a8d5b4;color:#1b5e32}
+.login-logo .logo{filter:none}
+
+/* animatsiyalar o'chiriladi — rasmiy uslub */
+.logo-anim .l-bolt,.logo-anim .l-spark,.logo-anim .l-ring{animation:none}
+.card,.tab,.nav-item{transition:none}
+
+/* v4: ko'rsatkich kartalari — bir xil tekis ko'k, rang faqat chap chiziqda (holat ma'nosi) */
+.kpi{border-radius:var(--r);box-shadow:var(--shadow);border:1px solid var(--line);animation:none}
+.kpi:before{width:4px}
+.kpi-ic{border-radius:6px;background:#e8eef8;color:var(--gov2);box-shadow:none}
+.kpi-b small{color:var(--mut)}.kpi-b b{color:var(--gov)}
+.kpi-d{border-radius:4px}
+/* kirish maydonlari: ikki qavat chegara bo'lmasin */
+.input-ic{border-radius:4px;border:1px solid #b9c5d8;background:#fff;box-shadow:none}
+.input-ic:focus-within{border-color:var(--gov2);box-shadow:0 0 0 2px rgba(18,57,107,.2)}
+.input-ic input{border:0;outline:0;box-shadow:none;background:transparent;border-radius:0}
+.input-ic svg{color:#6b7c95}
+.login-card .btn.primary{background:var(--gov2);opacity:1}
+.login-card .btn.primary:disabled{background:#8fa0b8}
+.login-card a,.login-card .lnk{color:var(--gov2)}
+

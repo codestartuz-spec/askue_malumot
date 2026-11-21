@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Globe2, GitCompareArrows, CalendarRange, FileText, FileSpreadsheet, FileDown, Send, RefreshCw, UploadCloud, FileBarChart2 } from 'lucide-react'
-import { api, download, qs } from '../api'
+import { useMemo } from 'react'
+import { FileBarChart2 } from 'lucide-react'
 import { useAuth } from '../auth'
-import { Empty, Spinner, useToast } from '../ui'
+import { Spinner } from '../ui'
 import { dmy, num } from '../fmt'
 import { SendModal } from './Republic'
+import { PdfEmpty, PdfFilters, isBlocked, usePdfDyn } from './pdfDyn'
 
 const G = 9
 const BAR = { 4: 'ag-b4', 7: 'ag-b7', 8: 'ag-b7' }                      // foizli chiziqcha: guruh → rang sinfi
@@ -67,68 +66,25 @@ function AgTable({ d }) {
 }
 
 export default function Ag() {
-  const { can } = useAuth()
-  const toast = useToast()
-  const [a, setA] = useState('')
-  const [b, setB] = useState('')
-  const [data, setData] = useState(null)
-  const [err, setErr] = useState('')
-  const [send, setSend] = useState(false)
-  const [busy, setBusy] = useState('')
-  const [mode, setMode] = useState('oy')
-  const load = () => {
-    setErr('')
-    api.get(`/ag/compare${qs({ a, b, mode })}`).then((d) => { setData(d); if (!b) setB(d.b); if (!a && d.a) setA(d.a) }).catch((e) => { setErr(e.message); setData(null) })
-  }
-  useEffect(() => { load() }, [a, b, mode])
-  const pick = (m) => { if (m !== mode) { setA(''); setMode(m) } }
-  const dl = async (fmt) => {
-    setBusy(fmt)
-    try { await download(`/ag/download${qs({ fmt, a, b, mode })}`, `AG_dinamikasi.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`) } catch (e) { toast(e.message, 'err') } finally { setBusy('') }
-  }
-  const dates = data?.dates || []
+  const { boot } = useAuth()
+  const st = usePdfDyn('/ag', 'AG_dinamikasi')
+  const { data, mode } = st
   return (
     <div className="dyn rep ag">
       <div className="card head-card">
         <div className="titles">
-          <h2 className="ttl">{data?.title || "24.02.2023 dagi № 01-04-42-22 sonli topshiriq ijrosi bo'yicha"}</h2>
+          <h2 className="ttl">{data?.title || ''}</h2>
           <div className="ag-mal">Ma'lumot</div>
         </div>
-        <div className="filters">
-          <label className="filter"><span><Globe2 size={15} />Hudud nomi:</span><b className="static-box">{data?.region || 'Qashqadaryo HETK'}</b></label>
-          <div className="seg" role="tablist" aria-label="Farq turi">
-            <button role="tab" aria-selected={mode === 'oy'} className={mode === 'oy' ? 'on' : ''} onClick={() => pick('oy')}><CalendarRange size={15} />Boshidan</button>
-            <button role="tab" aria-selected={mode === 'kunlik'} className={mode === 'kunlik' ? 'on' : ''} onClick={() => pick('kunlik')}><GitCompareArrows size={15} />Kunlik</button>
-          </div>
-          {dates.length > 0 && mode === 'oy' && (<label className="filter"><span><CalendarRange size={16} />Sana:</span>
-            <select value={data?.b || ''} onChange={(e) => setB(e.target.value)}>{dates.map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
-            <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button></label>)}
-          {dates.length > 1 && mode === 'kunlik' && (<label className="filter"><span><GitCompareArrows size={16} />Solishtirish:</span>
-            <select value={data?.a || ''} onChange={(e) => setA(e.target.value)}>
-              {dates.filter((d) => !data || d < data.b).map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
-            <b>→</b>
-            <select value={data?.b || ''} onChange={(e) => { setB(e.target.value); setA('') }}>{dates.map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
-            <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button></label>)}
-          <div className="spacer" />
-          {can('report.download') && data && (<>
-            <button className="btn ghost" disabled={!!busy} onClick={() => dl('pdf')}><FileText size={16} />PDF</button>
-            <button className="btn ghost" disabled={!!busy} onClick={() => dl('xlsx')}><FileSpreadsheet size={16} />Excel</button>
-            <button className="btn ghost" hidden={!can('ag.original')} disabled={!!busy} title="AG markazi yuborgan asl PDF fayl" onClick={() => dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
-          {can('telegram.send') && data && <button className="btn primary" onClick={() => setSend(true)}><Send size={16} />Telegramga yuborish</button>}
-        </div>
+        <PdfFilters st={st} region={data?.region || boot?.region_name || ''} perm="ag" firstLabel="Boshidan" origHint="AG markazi yuborgan asl PDF fayl" />
       </div>
-      {err ? (
-        <div className="card pad"><Empty icon={FileBarChart2}>{err}{can('ag.upload') && <div style={{ marginTop: 10 }}><Link className="btn primary" to="/yuklash?t=ag"><UploadCloud size={16} />PDF yuklash</Link></div>}</Empty></div>
-      ) : !data ? <Spinner /> : mode === 'kunlik' && !data.a ? (
-        <div className="card pad"><Empty icon={GitCompareArrows}>Kunlik solishtirish uchun kamida ikkita sananing PDF'i kerak — hozir faqat bitta ({dmy(data.b)}) yuklangan.
-          {can('ag.upload') && <div style={{ marginTop: 10 }}><Link className="btn primary" to="/yuklash?t=ag"><UploadCloud size={16} />Yangi PDF yuklash</Link></div>}</Empty></div>
-      ) : (
+      {!data && !st.err ? <Spinner /> : isBlocked(st) ? <PdfEmpty st={st} perm="ag" tab="ag" icon={FileBarChart2} /> : (
         <div className="card tcard">
           <div className="ag-farq">Farq: <b>{dmy(data.from)} - {dmy(data.to)}</b></div>
           <div className="tbl-scroll"><AgTable d={data} /></div>
           <div className="note">{data.a ? <>Kunlik farq (↑↓): oxirgi ikki yuklangan PDF — <b>{dmy(data.a)}</b> bilan <b>{dmy(data.b)}</b> o'rtasidagi o'zgarish.</> : <>Farq (↑↓): boshlang'ich sana <b>{dmy(data.start)}</b> dan <b>{dmy(data.b)}</b> gacha (AG PDF'i bo'yicha). Oxirgi ikki PDF'ni solishtirish uchun «Kunlik» ni tanlang.</>}</div>
         </div>)}
-      {send && data && <SendModal a={data.a} b={data.b} mode={mode} base="/ag" title="AG dinamikasini Telegram'ga yuborish" origHint="AG markazi yuborgan fayl, o'zgartirishsiz" onClose={() => setSend(false)} />}
+      {st.send && data && <SendModal a={data.a} b={data.b} mode={mode} base="/ag" title="AG dinamikasini Telegram'ga yuborish" origHint="AG markazi yuborgan fayl, o'zgartirishsiz" onClose={() => st.setSend(false)} />}
     </div>
   )
 }

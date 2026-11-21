@@ -1,0 +1,11 @@
+/* Tartib muhim: keyingi qatlam oldingisini bosib o'tadi (kaskad). Fayl nomidagi raqam — tartib. */
+@import './01-base.css';
+@import './02-components.css';
+@import './03-v3-layout.css';
+@import './04-v4-official.css';
+@import './05-v5-energy.css';
+@import './06-v6-tables-map.css';
+@import './07-v7-login-devices.css';
+@import './08-v8-pdf-tables.css';
+@import './09-v9-ag.css';
+@import './10-audit-settings.css';
