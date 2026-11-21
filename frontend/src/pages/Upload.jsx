@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Eye, Download, UploadCloud, FileArchive, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, CalendarDays, X, Rocket, Server, Globe2, FileText, Trash2 } from 'lucide-react'
+import { Eye, Download, UploadCloud, FileArchive, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, CalendarDays, X, Rocket, Server, Globe2, FileText, Trash2, FileBarChart2 } from 'lucide-react'
 import { api, download, openFile, qs, uploadForm } from '../api'
 import { useAuth } from '../auth'
 import { Confirm, useToast } from '../ui'
@@ -66,47 +66,58 @@ function JobTable({ jobs, onDelete }) {
   )
 }
 
-function RepUpload() {
+// Respublika va AG PDF'larini yuklash (ikkalasi bir xil jarayon)
+const PDF_KINDS = {
+  resp: { base: '/republic', icon: Globe2, label: 'Respublika dinamikasi', noun: 'respublika', unit: 'jadval', col: 'Jadvallar', perm: 'republic.original',
+    hint: 'Qashqadaryo_HETK_dynamic-01.11.2026--20.11.2026.pdf — oy boshidan oxirgi sanagacha',
+    info: "PDF ichidagi viloyat «Жами» qatori va sana avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
+  ag: { base: '/ag', icon: FileBarChart2, label: 'AG dinamikasi', noun: 'AG', unit: 'hudud', col: 'Hududlar', perm: 'ag.original',
+    hint: 'Qashqadaryo_HETK_AG19-20.02.2023--17.11.2026.pdf — boshlang\'ich sanadan oxirgi sanagacha',
+    info: "PDF ichidagi «Farq: 20.02.2023 - 17.11.2026» sanasi va barcha hududlar qatori avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
+}
+
+function PdfUpload({ kind }) {
+  const K = PDF_KINDS[kind]
   const toast = useToast()
   const [file, setFile] = useState(null)
   const [pct, setPct] = useState(null)
   const [list, setList] = useState(null)
-  const load = () => api.get('/republic').then(setList).catch(() => setList([]))
+  const load = () => api.get(K.base).then(setList).catch(() => setList([]))
   useEffect(() => { load() }, [])
   const go = async () => {
     const f = new FormData(); f.append('file', file); setPct(0)
     try {
-      const r = await uploadForm('/republic/upload', f, setPct)
-      toast(`Qabul qilindi: ${dmy(r.end)} (${r.pages} ta jadval)${r.replaced ? ' — oldingisi yangilandi' : ''}`)
+      const r = await uploadForm(`${K.base}/upload`, f, setPct)
+      toast(`Qabul qilindi: ${dmy(r.end)} (${r.pages} ta ${K.unit})${r.replaced ? ' — oldingisi yangilandi' : ''}`)
       setFile(null); load()
     } catch (e) { toast(e.message, 'err') } finally { setPct(null) }
   }
   const { can } = useAuth()
   const [ask, setAsk] = useState(null)
-  const del = async () => { const r = ask; setAsk(null); try { await api.del(`/republic/${r.id}`); toast(`${dmy(r.end)} o'chirildi`); load() } catch (e) { toast(e.message, 'err') } }
-  const view = (r) => openFile(`/republic/${r.id}/file?inline=1`).catch((e) => toast(e.message, 'err'))
-  const dl = (r) => download(`/republic/${r.id}/file`, r.filename).catch((e) => toast(e.message, 'err'))
+  const del = async () => { const r = ask; setAsk(null); try { await api.del(`${K.base}/${r.id}`); toast(`${dmy(r.end)} o'chirildi`); load() } catch (e) { toast(e.message, 'err') } }
+  const view = (r) => openFile(`${K.base}/${r.id}/file?inline=1`).catch((e) => toast(e.message, 'err'))
+  const dl = (r) => download(`${K.base}/${r.id}/file`, r.filename).catch((e) => toast(e.message, 'err'))
   return (<>
     <div className="card pad">
-      <div className="drops one"><Drop icon={Globe2} label="Respublika dinamikasi (PDF)" hint="Qashqadaryo_HETK_dynamic-01.11.2026--20.11.2026.pdf — oy boshidan oxirgi sanagacha" accept=".pdf" file={file} onFile={setFile} /></div>
+      <div className="drops one"><Drop icon={K.icon} label={`${K.label} (PDF)`} hint={K.hint} accept=".pdf" file={file} onFile={setFile} /></div>
       <div className="upl-row">
-        <small className="hint">PDF ichidagi viloyat «Жами» qatori va sana avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang.</small>
+        <small className="hint">{K.info}</small>
         <div className="spacer" />
         <button className="btn primary big" disabled={!file || pct !== null} onClick={go}><Rocket size={18} />{pct !== null ? `Yuborilmoqda ${Math.round(pct * 100)}%` : 'Yuklash'}</button>
       </div>
       {pct !== null && <div className="progress"><div className="bar" style={{ width: `${pct * 100}%` }} /></div>}
     </div>
     <h3 className="sec-title">Yuklangan sanalar</h3>
-    {!list ? null : list.length === 0 ? <div className="card pad mut">Hali respublika PDF'i yuklanmagan.</div> : (
-      <div className="card tcard"><div className="tbl-scroll"><table className="list"><thead><tr><th>Sana</th><th>Davr</th><th>Fayl</th><th>Jadvallar</th><th>Yuklagan</th><th /></tr></thead>
+    {!list ? null : list.length === 0 ? <div className="card pad mut">Hali {K.noun} PDF'i yuklanmagan.</div> : (
+      <div className="card tcard"><div className="tbl-scroll"><table className="list"><thead><tr><th>Sana</th><th>Davr</th><th>Fayl</th><th>{K.col}</th><th>Yuklagan</th><th /></tr></thead>
         <tbody>{list.map((r) => (<tr key={r.id}><td className="b">{dmy(r.end)}</td><td className="nowrap-d">{dmy(r.start)} – {dmy(r.end)}</td><td className="mut"><FileText size={14} /> {r.filename}</td><td>{r.pages}</td><td className="mut">{r.by} • {dt(r.at)}</td>
           <td className="acts">
-          {can('republic.original') && r.has_file && <><button className="btn ghost sm" title="PDF'ni brauzerda ochish" onClick={() => view(r)}><Eye size={15} />Ko'rish</button>
+          {can(K.perm) && r.has_file && <><button className="btn ghost sm" title="PDF'ni brauzerda ochish" onClick={() => view(r)}><Eye size={15} />Ko'rish</button>
             <button className="btn ghost sm" title="PDF'ni yuklab olish" onClick={() => dl(r)}><Download size={15} />Yuklab olish</button></>}
-          {can('republic.original') && !r.has_file && <small className="mut">Fayl serverda yo'q</small>}
+          {can(K.perm) && !r.has_file && <small className="mut">Fayl serverda yo'q</small>}
           {can('data.delete') && <button className="icon-btn danger" title="O'chirish" onClick={() => setAsk(r)}><Trash2 size={16} /></button>}</td></tr>))}</tbody></table></div></div>)}
-    {ask && <Confirm icon={Trash2} danger title="Respublika ma'lumotini o'chirish" ok="Ha, o'chirish" onOk={del} onCancel={() => setAsk(null)}>
-      <b>{dmy(ask.end)}</b> sanadagi respublika dinamikasi ({ask.filename}) o'chiriladi: jadval ma'lumoti va serverdagi PDF fayl. Qaytarib bo'lmaydi.
+    {ask && <Confirm icon={Trash2} danger title={`${K.label} ma'lumotini o'chirish`} ok="Ha, o'chirish" onOk={del} onCancel={() => setAsk(null)}>
+      <b>{dmy(ask.end)}</b> sanadagi {K.label.toLowerCase()} ({ask.filename}) o'chiriladi: jadval ma'lumoti va serverdagi PDF fayl. Qaytarib bo'lmaydi.
       <small className="hint">Kunlik solishtirish endi oldingi sanalar bilan hisoblanadi.</small></Confirm>}
   </>)
 }
@@ -114,15 +125,21 @@ function RepUpload() {
 export default function Upload() {
   const [sp, setSp] = useSearchParams()
   const { can } = useAuth()
-  const canD = can('data.upload'), canR = can('republic.upload')
-  const tab = (sp.get('t') === 'resp' && canR) || !canD ? 'resp' : 'kunlik'
+  const tabs = [
+    can('data.upload') && { k: 'kunlik', icon: UploadCloud, label: "Kunlik ma'lumot (Area / Details)" },
+    can('republic.upload') && { k: 'resp', icon: Globe2, label: 'Respublika dinamikasi' },
+    can('ag.upload') && { k: 'ag', icon: FileBarChart2, label: 'AG dinamikasi' },
+  ].filter(Boolean)
+  const want = sp.get('t') || 'kunlik'
+  const tab = (tabs.find((t) => t.k === want) || tabs[0] || { k: 'kunlik' }).k
+  const sub = { resp: "Respublika markazi tayyorlagan dinamika PDF'ini (oy boshidan oxirgi sanagacha) yuklang.",
+    ag: "AG (Aloqadan chiqib ketgan hisoblagichlar va hodisalar) dinamikasi PDF'ini yuklang: «Farq: 20.02.2023 - …»." }
   return (
     <div className="upl">
-      {canD && canR && <div className="tabs" role="tablist">
-        <button role="tab" className={`tab ${tab === 'kunlik' ? 'on' : ''}`} onClick={() => setSp({}, { replace: true })}><UploadCloud size={18} /><span>Kunlik ma'lumot (Area / Details)</span></button>
-        <button role="tab" className={`tab ${tab === 'resp' ? 'on' : ''}`} onClick={() => setSp({ t: 'resp' }, { replace: true })}><Globe2 size={18} /><span>Respublika dinamikasi</span></button>
+      {tabs.length > 1 && <div className="tabs" role="tablist">
+        {tabs.map((t) => <button key={t.k} role="tab" className={`tab ${tab === t.k ? 'on' : ''}`} onClick={() => setSp(t.k === 'kunlik' ? {} : { t: t.k }, { replace: true })}><t.icon size={18} /><span>{t.label}</span></button>)}
       </div>}
-      {tab === 'resp' ? <><div className="card head-card"><div className="titles"><h2 className="ttl">Respublika dinamikasi</h2><p className="sub">Respublika markazi tayyorlagan dinamika PDF'ini (oy boshidan oxirgi sanagacha) yuklang.</p></div></div><RepUpload /></> : <DailyUpload />}
+      {tab === 'resp' || tab === 'ag' ? <><div className="card head-card"><div className="titles"><h2 className="ttl">{PDF_KINDS[tab].label}</h2><p className="sub">{sub[tab]}</p></div></div><PdfUpload key={tab} kind={tab} /></> : <DailyUpload />}
     </div>
   )
 }

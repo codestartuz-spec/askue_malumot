@@ -7,11 +7,11 @@ import { dt } from '../fmt'
 
 // Tayyor ruxsat to'plamlari (tez belgilash uchun)
 const PRESETS = [
-  { name: 'Kuzatuvchi', hint: 'Faqat jadvallarni ko\'radi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view'] },
-  { name: 'Operator', hint: "Jadval, xarita, ro'yxat va Excel/PDF", codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'map.view', 'drill.view', 'export', 'dynamics.compare', 'report.download', 'republic.original'] },
+  { name: 'Kuzatuvchi', hint: 'Faqat jadvallarni ko\'radi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'ag.view'] },
+  { name: 'Operator', hint: "Jadval, xarita, ro'yxat va Excel/PDF", codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'map.view', 'drill.view', 'export', 'dynamics.compare', 'report.download', 'republic.original', 'ag.view', 'ag.original'] },
   { name: 'Brigadir', hint: 'Brigadalar va xarita', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'map.view', 'brigade.view', 'brigade.edit', 'brigade.assign', 'drill.view', 'export'] },
-  { name: "Ma'lumot kiritish", hint: 'Fayl yuklaydi va o\'chiradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'data.upload', 'republic.upload', 'data.delete', 'republic.original'] },
-  { name: 'Telegram operatori', hint: 'Hisobot va xabar yuboradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'report.download', 'telegram.send', 'telegram.message', 'telegram.journal'] },
+  { name: "Ma'lumot kiritish", hint: 'Fayl yuklaydi va o\'chiradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'data.upload', 'republic.upload', 'data.delete', 'republic.original', 'ag.view', 'ag.upload', 'ag.original'] },
+  { name: 'Telegram operatori', hint: 'Hisobot va xabar yuboradi', codes: ['view.konsentrator', 'view.aloqa', 'view.obxod', 'republic.view', 'ag.view', 'report.download', 'telegram.send', 'telegram.message', 'telegram.journal'] },
 ]
 
 const initials = (u) => (u.full_name || u.username || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()

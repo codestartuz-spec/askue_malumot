@@ -6,7 +6,8 @@ import { dt } from '../fmt'
 
 const NAMES = { upload: "Ma'lumot yuklash", brigada_tahrir: 'Brigada tahriri', tp_biriktirish: 'TP biriktirish', "brigada_qo'shildi": "Brigada qo'shildi",
   "xodim_qo'shildi": "Xodim qo'shildi", "xodim_o'zgardi": "Xodim o'zgardi", parol: 'Parol', kirish: 'Tizimga kirdi', chiqish: 'Tizimdan chiqdi',
-  kirish_xato: 'Kirish xatosi', qurilma_blok: 'Qurilma bloklandi', qurilma_ochildi: 'Qurilma ochildi', qurilma_chiqarish: 'Qurilmadan chiqarildi' }
+  kirish_xato: 'Kirish xatosi', qurilma_blok: 'Qurilma bloklandi', qurilma_ochildi: 'Qurilma ochildi', qurilma_chiqarish: 'Qurilmadan chiqarildi',
+  ag_yuklash: 'AG PDF yuklandi', ag_ochirish: "AG ma'lumoti o'chirildi", telegram_ag: 'AG Telegramga yuborildi' }
 
 export default function Audit() {
   const [page, setPage] = useState(1)

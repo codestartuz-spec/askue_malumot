@@ -1072,3 +1072,45 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)!important;outli
 .dyn-table td.name{font-weight:500}
 .dyn-table td.name button{color:#000;font-weight:500}
 .dyn-table td.name.link button:hover{color:#1450c8}
+
+/* ===================== v9: AG dinamikasi (asl AG PDF dizayni) ===================== */
+.ag-mal{margin-top:4px;color:#ff0000;font-weight:800;font-size:22px;text-align:center;letter-spacing:0;animation:none}
+.ag .head-card .titles{text-align:center}
+.ag .head-card .ttl{font-size:17px}
+.ag-farq{padding:8px 14px 6px;text-align:right;color:#0000ff;font-size:13px}
+.ag-table{border-collapse:collapse;width:100%;min-width:1040px;font-size:13px;background:#fff;font-family:Carlito,Calibri,'Segoe UI',system-ui,sans-serif}
+.ag-table th,.ag-table td{border:1px solid #1d1d1d;padding:0 6px;text-align:center;vertical-align:middle}
+.ag-table th{background:#d9e1f2;color:#000;font-weight:700;font-size:12.5px;line-height:1.25;padding:4px 5px}
+.ag-table th.ag-pk{background:#ffe6e6}
+.ag-table th.ag-it{font-style:italic}
+.ag-table th.ag-red{color:#c00000}
+.ag-table th.ag-big{font-size:15.5px;padding:8px}
+.ag-table th.ag-nm{font-size:15.5px;min-width:150px}
+.ag-table th.ag-s{font-size:12px}
+.ag-table th.ag-xs{font-size:11px}
+.ag-table th.ag-m{font-size:12.5px}
+.ag-table th i.ag-sky{font-style:normal;color:#00b0f0}
+.ag-table th b.ag-rd{color:#ff0000}
+.ag-table td{height:34px;background:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+.ag-table td.ag-name{text-align:left;font-weight:500;font-size:13px;padding-left:9px;position:sticky;left:0;z-index:1;white-space:nowrap;box-shadow:1px 0 0 #1d1d1d}
+.ag-table td.ag-v{text-align:right;font-size:13px;padding-right:6px;position:relative;white-space:nowrap}
+.ag-table td.ag-v.ag-red{color:#c00000}
+.ag-table td.ag-v.ag-big{font-size:15.5px}
+.ag-table td.ag-dl{text-align:right;padding-right:5px;font-size:11.5px;white-space:nowrap}
+.ag-table td.ag-v span{position:relative;z-index:1}
+.ag-table td.ag-b4,.ag-table td.ag-b7{background-repeat:no-repeat;background-position:2px 50%;background-size:calc(var(--p, 0) * (100% - 5px) / 100) calc(100% - 7px)}
+.ag-table td.ag-b4{background-image:linear-gradient(#f8cbad,#f8cbad)}
+.ag-table td.ag-b7{background-image:linear-gradient(#ffd966,#ffd966)}
+.ag-table tr.ag-total td{background:#ffe699;height:38px;border-top:1px solid #1d1d1d;animation:none}
+.ag-table tr.ag-total td.ag-name{text-align:center;font-weight:800;font-size:16px;background:#ffe699}
+.ag-table tr.ag-total td.ag-v{font-size:16px;font-weight:800}
+.ag-table tr.ag-total td.ag-v.ag-grn{color:#00b050}
+.ag-table tr.ag-total td.ag-v.ag-red{color:#c00000}
+.ag-table tr.ag-total td.ag-v.ag-dkr{color:#860404}
+.ag-table tr.ag-total td.ag-dl{font-size:12.5px}
+.ag-table tbody tr:not(.ag-total):hover td:not(.ag-b4):not(.ag-b7){background:#f1f6ff}
+.ag-table tbody tr:not(.ag-total):hover td.ag-name{background:#f1f6ff}
+.agd{font-weight:700}
+.agd b{font-weight:800;margin-right:3px;font-size:1.05em}
+.agd.up{color:#ff0000}.agd.dn{color:#0000ff}
+@media (max-width:720px){.ag-mal{font-size:18px}.ag .head-card .ttl{font-size:14.5px}}

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Send, ScrollText, FileText, Image as ImageIcon, CheckCircle2, AlertTriangle, Users, Megaphone, ChevronRight, MailCheck, Globe2, Table2, RefreshCw } from 'lucide-react'
+import { Send, ScrollText, FileText, Image as ImageIcon, CheckCircle2, AlertTriangle, Users, Megaphone, ChevronRight, MailCheck, Globe2, Table2, RefreshCw, FileBarChart2 } from 'lucide-react'
 import { api, qs } from '../api'
 import { Empty, Modal, Pager, Spinner, useToast } from '../ui'
 import { dt } from '../fmt'
 import { useAuth } from '../auth'
 import Compose from './Compose'
 
-const KIND = { xabar: { label: 'Xabar', icon: Send, cls: 'blue' }, hisobot: { label: 'Kunlik hisobot', icon: Table2, cls: 'green' }, respublika: { label: 'Respublika', icon: Globe2, cls: 'amber' } }
+const KIND = { xabar: { label: 'Xabar', icon: Send, cls: 'blue' }, hisobot: { label: 'Kunlik hisobot', icon: Table2, cls: 'green' }, respublika: { label: 'Respublika', icon: Globe2, cls: 'amber' }, ag: { label: 'AG', icon: FileBarChart2, cls: 'purple' } }
 
 function PostModal({ id, onClose }) {
   const [p, setP] = useState(null)
@@ -56,7 +56,7 @@ function Journal() {
   return (
     <div className="card pad journal">
       <div className="jr-top">
-        <div className="chips">{[['', 'Hammasi'], ['xabar', 'Xabarlar'], ['hisobot', 'Kunlik hisobotlar'], ['respublika', 'Respublika']].map(([k, l]) => (
+        <div className="chips">{[['', 'Hammasi'], ['xabar', 'Xabarlar'], ['hisobot', 'Kunlik hisobotlar'], ['respublika', 'Respublika'], ['ag', 'AG']].map(([k, l]) => (
           <button key={k} className={`chip ${kind === k ? 'on' : ''}`} onClick={() => { setKind(k); setPage(1) }}>{l}</button>))}</div>
         <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button>
       </div>

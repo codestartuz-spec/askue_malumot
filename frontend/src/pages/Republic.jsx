@@ -14,7 +14,7 @@ const Diff = ({ v, bad = true }) => {
 }
 const pdfD = (v) => (v === null || v === undefined || v === 0) ? '' : <span className={`pdfd ${v > 0 ? 'up' : 'dn'}`}>{v > 0 ? '↑' : '↓'} {num(Math.abs(v))}</span>
 
-function SendModal({ a, b, mode, onClose }) {
+export function SendModal({ a, b, mode, onClose, base = '/republic', title = "Respublika dinamikasini Telegram'ga yuborish", origHint = "Respublika yuborgan fayl, o'zgartirishsiz" }) {
   const { can } = useAuth()
   const toast = useToast()
   const [chats, setChats] = useState(null)
@@ -38,11 +38,11 @@ function SendModal({ a, b, mode, onClose }) {
   }
   const go = async () => {
     setBusy(true)
-    try { const r = await api.post('/republic/send', { fmts: [...fmts], chat_ids: [...sel], a, b, mode, ack }); setJob({ status: 'running', progress: 0, log: '' }); poll(r.id) }
+    try { const r = await api.post(`${base}/send`, { fmts: [...fmts], chat_ids: [...sel], a, b, mode, ack }); setJob({ status: 'running', progress: 0, log: '' }); poll(r.id) }
     catch (e) { toast(e.message, 'err'); setBusy(false) }
   }
   return (
-    <Modal wide icon={Send} title="Respublika dinamikasini Telegram'ga yuborish" onClose={busy ? () => {} : onClose}
+    <Modal wide icon={Send} title={title} onClose={busy ? () => {} : onClose}
       footer={<><div className="foot-info">{fmts.size} ta fayl{sel.size ? ` → ${sel.size} ta kanal` : ''}</div>
         <button className="btn ghost" onClick={onClose} disabled={busy}>Yopish</button>
         <button className="btn primary" disabled={busy || !fmts.size || !sel.size} onClick={go}><Send size={16} />Yuborish</button></>}>
@@ -51,7 +51,7 @@ function SendModal({ a, b, mode, onClose }) {
           <div className="mp-sec dark">1. Qaysi formatda</div>
           <div className="opts">
             <label className={`opt ${fmts.has('pdf') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('pdf')} onChange={() => tg(setFmts, 'pdf')} disabled={busy} /><i><FileText size={20} /></i><span><b>PDF</b><small>{dmy(b)} holatiga{a ? `, ${dmy(a)} bilan solishtirib` : ', oy boshidan dinamika'}</small></span></label>
-            <label className={`opt ${fmts.has('orig') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('orig')} onChange={() => tg(setFmts, 'orig')} disabled={busy} /><i><FileDown size={20} /></i><span><b>Asl PDF</b><small>Respublika yuborgan fayl, o'zgartirishsiz</small></span></label>
+            <label className={`opt ${fmts.has('orig') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('orig')} onChange={() => tg(setFmts, 'orig')} disabled={busy} /><i><FileDown size={20} /></i><span><b>Asl PDF</b><small>{origHint}</small></span></label>
             <label className={`opt ${fmts.has('xlsx') ? 'on' : ''}`}><input type="checkbox" checked={fmts.has('xlsx')} onChange={() => tg(setFmts, 'xlsx')} disabled={busy} /><i><FileSpreadsheet size={20} /></i><span><b>Excel</b><small>Jadval ko'rinishida</small></span></label>
           </div>
         </div>
