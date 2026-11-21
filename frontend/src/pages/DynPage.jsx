@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowDown, ArrowUp, Download, Search, MapPin, MapPinned, CalendarRange, List, RefreshCw, ArrowLeft, Users } from 'lucide-react'
+import { Download, Search, MapPin, MapPinned, CalendarRange, List, RefreshCw, ArrowLeft, Users } from 'lucide-react'
 import { api, download, qs } from '../api'
 import { useAuth } from '../auth'
 import { TABLES, METRIC_TITLES } from '../tables'
 import { Empty, Modal, Pager, Spinner, useCountUp, useDebounced, useToast } from '../ui'
 import { dmy, num, pct } from '../fmt'
+
+// Asl PDF'dagi och sariq «soni» ustunlari (1-asosli tartib raqami)
+const CREAM = { konsentrator: new Set([7, 9, 11, 13, 15]), aloqa: new Set([1, 10, 12, 14, 16]) }
 
 const POL = {
   bad: { up: 'red', down: 'blue' },
@@ -16,8 +19,7 @@ const POL = {
 export function Delta({ v, pol }) {
   if (v === null || v === undefined || v === 0) return null
   const up = v > 0
-  const Ic = up ? ArrowUp : ArrowDown
-  return <span className={`delta ${POL[pol][up ? 'up' : 'down']}`}><Ic size={13} strokeWidth={3} />{num(v)}</span>
+  return <span className={`delta ${POL[pol][up ? 'up' : 'down']}`}><b>{up ? '↑' : '↓'}</b>{up ? num(v) : `-${num(Math.abs(v))}`}</span>
 }
 
 function Pin({ r }) {
@@ -88,13 +90,13 @@ function DrillModal({ kind, metric, espId, brigadeId, scope, onClose }) {
   )
 }
 
-export function Cell({ col, row, onDrill, canDrill, total, idx }) {
+export function Cell({ col, row, onDrill, canDrill, total, cream }) {
   const cur = row.cur, base = row.base
   if (col.t === 'n') {
     const v = cur[col.m]
     const shown = total ? <CountNum v={v} /> : num(v)
     return (
-      <td className={`c-${col.cls.split(' ').join(' c-')}`}>
+      <td className={`c-${col.cls.split(' ').join(' c-')} ${cream ? 'cream' : ''}`}>
         {v > 0 && canDrill ? <button className="numlink" onClick={() => onDrill(col)}>{shown}</button> : (v > 0 ? shown : '')}
       </td>
     )
@@ -203,7 +205,7 @@ export default function DynPage({ table, esp, setEsp, from, setFrom, to, setTo, 
                     <td className={`name ${!byBrigade ? 'link' : ''} ${r.id === 0 && byBrigade ? 'warn' : ''}`}>
                       {!byBrigade ? <button onClick={() => setEsp(String(r.id))}>{r.name}</button> : <>{r.name}{r.members?.length > 0 && <small className="staff"><Users size={11} />{r.members.join(', ')}</small>}</>}
                     </td>
-                    {cfg.cols.map((c, i) => <Cell key={i} col={c} row={r} canDrill={canDrill} onDrill={(col) => openDrill(col, r)} />)}
+                    {cfg.cols.map((c, i) => <Cell key={i} col={c} row={r} cream={CREAM[table]?.has(i + 1)} canDrill={canDrill} onDrill={(col) => openDrill(col, r)} />)}
                   </tr>))}
               </tbody>
             </table>

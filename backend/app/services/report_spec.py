@@ -12,13 +12,14 @@ TABLES = {
         "title": "hududida CAS dasturida mavjud konsentratorlar holati bo'yicha",
         "short": "Konsentratorlar",
         "head": [
-            [H("Hudud nomi", 3, 1), H("Dasturda mavjud transformatorlar soni", 3, 1, "vert"),
-             H("Konsentratorlar", 1, 5), H("Konsentratorlarning obxod olish darajasi bo'yicha soni", 1, 10),
-             H("Iste'molchi biriktirilmagan konsentratorlar soni", 3, 1, "vert red")],
-            [H("CAS ga yuklangan", 2, 1, "vert"), H("shundan", 1, 4, "it"), H("0%", 1, 2), H("1-30%", 1, 2),
-             H("30-50%", 1, 2), H("50-80%", 1, 2), H("80-100%", 1, 2)],
-            [H("Online", c="green s"), H("Offline (jami)", c="red s"), H("shundan 3 kundan ortiq", c="red s"), _ARR]
-            + [x for _ in range(5) for x in (H("soni", c="red s"), _ARR)],
+            [H("Hudud nomi", 4, 1), H("Dasturda mavjud transformatorlar soni", 4, 1, "vert"),
+             H("Konsentratorlar", 1, 5), H("Konsentratorlarning\n{obxod olish darajasi bo'yicha} soni", 1, 10),
+             H("Iste'molchi biriktirilmagan konsentratorlar soni", 4, 1, "vert red")],
+            [H("CAS ga yuklangan", 3, 1, "vert"), H("shundan", 1, 4, "it"), H("0%", 2, 2), H("1-30%", 2, 2),
+             H("30-50%", 2, 2), H("50-80%", 2, 2), H("80-100%", 2, 2)],
+            [H("Online", 2, 1, "green s"), H("Offline (jami)", 2, 1, "red s"),
+             H("shundan 3 kundan ortiq", 2, 1, "red vert s"), H("↑↓", 2, 1, "arr")],
+            [x for _ in range(5) for x in (H("soni", c="red s"), _ARR)],
         ],
         "cols": [n("tp_total", "b"), n("cas_loaded", "b"), n("online", "green"), n("offline", "red"),
                  n("offline3", "red"), d("offline", "bad"),
@@ -159,11 +160,34 @@ TABLES["r8"] = {
 # pol: o'sish / kamayish ranglari
 POL = {"bad": ("red", "blue"), "mid": ("blue", "red"), "good": ("green", "red")}
 # Namuna (Excel) hisobotidagi ranglar: oq fon, qora chegara, och ko'k sarlavha, och sariq "Jami" qatori
-COLORS = {"red": "#C00000", "green": "#00A050", "blue": "#0033CC", "amber": "#C55A11", "purple": "#7030A0",
+COLORS = {"red": "#C00000", "green": "#00B050", "blue": "#0000FF", "amber": "#C55A11", "purple": "#7030A0",
           "": "#000000", "b": "#000000"}
-ARROW = {"up_red": "#FF0000", "down_blue": "#0033CC"}
-HEAD_BG = "#DCE6F1"
+ARROW_COL = {"red": "#FF0000", "blue": "#0000FF", "green": "#00C853"}   # ↑↓ o'qlari (asl PDF)
+HEAD_BG = "#DDEBF7"
 TOTAL_BG = "#FFE699"
+CREAM = "#FFFDEF"          # «soni» ustunlarining och sariq foni
+TINT = {"green": "#E2EFDA", "amber": "#FCE4D6", "purple": "#E4DFEC"}   # obxod: guruh sarlavhalari
+PINK = "#FCE4D6"           # obxod: foiz 90% dan kam bo'lsa
+
+# Asl PDF geometriyasi (pt): Letter albom, jadval 38.8 → 753.4, sarlavha 70.6, «Jami» 18.6, qator 13.44
+PAGE_W, PAGE_H = 792, 612
+TBL_X, TBL_W = 38.8, 714.6
+H4 = [22.2, 10.3, 23.3, 14.8]
+H3A = [22.2, 10.3, 38.1]
+H3B = [32.4, 23.3, 14.8]
+HEAD_H = {"obxod": H3A, "r6": H3A, "r4": H3B, "r7": H3B}
+TOTAL_H, ROW_H = 18.6, 13.44
+# Och sariq (cream) ustunlar: tanlangan «soni» ustunlari (cols ichidagi 1-asosli tartib raqami)
+_K = {7, 9, 11, 13, 15}
+CREAM_COLS = {"konsentrator": _K, "r1": _K, "aloqa": {1, 10, 12, 14, 16}, "r2": {2, 11, 13, 15},
+              "r3": {2, 5, 7, 9}, "r4": {7}}
+PINK_TABLES = {"obxod", "r6"}
+
+
+def head_heights(table: str, nrows: int) -> list[float]:
+    if table in HEAD_H:
+        return HEAD_H[table]
+    return H4 if nrows == 4 else H3B if nrows == 3 else [70.6 / nrows] * nrows
 HEAD_TXT = {"red": "#C00000", "green": "#00A050", "blue": "#2F5597", "amber": "#C55A11", "purple": "#7030A0",
             "": "#000000"}
 
@@ -215,4 +239,4 @@ def cell_values(col: tuple, cur: dict, base: dict | None):
     if dv == 0:
         return ("", "", False)
     up, down = POL[col[2]]
-    return (("↑" if dv > 0 else "↓") + fmt_num(abs(dv)), up if dv > 0 else down, True)
+    return (("↑ " + fmt_num(dv)) if dv > 0 else ("↓ -" + fmt_num(abs(dv))), up if dv > 0 else down, True)
