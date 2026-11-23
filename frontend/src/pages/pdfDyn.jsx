@@ -21,7 +21,7 @@ export function usePdfDyn(base, fileLabel) {
     setErr('')
     api.get(`${base}/compare${qs({ a, b, mode })}`).then((d) => { setData(d); if (!b) setB(d.b); if (!a && d.a) setA(d.a) }).catch((e) => { setErr(e.message); setData(null) })
   }
-  useEffect(() => { load() }, [a, b, mode]) // eslint-disable-line
+  useEffect(() => { load() }, [a, b, mode])
   const pick = (m) => { if (m !== mode) { setA(''); setMode(m) } }
   const dl = async (fmt) => {
     setBusy(fmt)

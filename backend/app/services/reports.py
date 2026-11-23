@@ -51,25 +51,31 @@ def _body_rows(data: dict):
 
 # --------------------------------------------------------------------- yordamchi
 def _segments(label: str) -> list[list[tuple[str, str | None]]]:
-    """«A\n{ko'k} B» → qatorlar ro'yxati: [[(matn, rang|None), ...], ...]."""
+    """«A\n{ko'k} [qizil] B» → qatorlar ro'yxati: [[(matn, rang|None), ...], ...]."""
     out = []
     for ln in label.split("\n"):
-        seg, buf, blue = [], "", False
+        seg, buf, col = [], "", None
         for ch in ln:
-            if ch in "{}":
+            if ch in "{[":
                 if buf:
-                    seg.append((buf, "#4472C4" if blue else None))
-                buf, blue = "", ch == "{"
+                    seg.append((buf, col))
+                buf, col = "", "#4472C4" if ch == "{" else "#C00000"
+            elif ch in "}]":
+                if buf:
+                    seg.append((buf, col))
+                buf, col = "", None
             else:
                 buf += ch
         if buf:
-            seg.append((buf, "#4472C4" if blue else None))
+            seg.append((buf, col))
         out.append(seg)
     return out
 
 
 def _plain(label: str) -> str:
-    return label.replace("{", "").replace("}", "")
+    for ch in "{}[]":
+        label = label.replace(ch, "")
+    return label
 
 
 def _split_delta(txt: str) -> tuple[str, str]:
@@ -261,7 +267,7 @@ def _text_block(c, x, y, w, h, label, st, size, tint_color=None, rot=False):
             if stringWidth(plain, font, size) <= w - 3 or len(ln) > 1:
                 lines.append(ln)
             else:
-                lines += [[(t, None)] for t in _wrap(plain, font, size, w - 3)]
+                lines += [[(t, ln[0][1] if ln else None)] for t in _wrap(plain, font, size, w - 3)]
         fits = len(lines) * lead <= h - 2 and all(
             stringWidth("".join(t for t, _ in ln), font, size) <= w - 2 for ln in lines)
         if fits or size <= 5:

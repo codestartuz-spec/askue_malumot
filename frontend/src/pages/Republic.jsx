@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Globe2, Download, Send, ArrowUp, ArrowDown, Megaphone, Users, AlertTriangle, CheckCircle2, MailCheck } from 'lucide-react'
-import { api, qs } from '../api'
+import { Link } from 'react-router-dom'
+import { Globe2, Send, Megaphone, AlertTriangle, CheckCircle2, MailCheck, FileText, FileDown, FileSpreadsheet } from 'lucide-react'
+import { api } from '../api'
 import { useAuth } from '../auth'
-import { ChatTable, Empty, Modal, Spinner, useToast } from '../ui'
-import { dmy, num } from '../fmt'
+import { ChatTable, Modal, Spinner, useToast } from '../ui'
+import { dmy } from '../fmt'
 import { Cell } from './DynPage'
 import { PdfEmpty, PdfFilters, isBlocked, usePdfDyn } from './pdfDyn'
-
-const Diff = ({ v, bad = true }) => {
-  if (v === null || v === undefined || v === 0) return <span className="mut">—</span>
-  const up = v > 0
-  return <span className={`delta ${up ? 'red' : 'blue'}`}>{up ? <ArrowUp size={13} strokeWidth={3} /> : <ArrowDown size={13} strokeWidth={3} />}{num(Math.abs(v))}</span>
-}
-const pdfD = (v) => (v === null || v === undefined || v === 0) ? '' : <span className={`pdfd ${v > 0 ? 'up' : 'dn'}`}>{v > 0 ? '↑' : '↓'} {num(Math.abs(v))}</span>
 
 export function SendModal({ a, b, mode, onClose, base = '/republic', title = "Respublika dinamikasini Telegram'ga yuborish", origHint = "Respublika yuborgan fayl, o'zgartirishsiz" }) {
   const { can } = useAuth()
@@ -116,6 +110,7 @@ export default function Republic() {
               </tbody>
             </table>
           </div>
+          {cur.warn && <div className="note" style={{ color: '#b45309', fontWeight: 600 }}>{cur.warn}</div>}
           <div className="note">{data.a ? <>Kunlik dinamika (↑↓): oxirgi ikki yuklangan PDF — <b>{dmy(data.a)}</b> bilan <b>{dmy(data.b)}</b> o'rtasidagi o'zgarish.</> : <>Dinamika (↑↓): oy boshidan <b>{dmy(data.b)}</b> gacha (respublika PDF'i bo'yicha). Oxirgi ikki kunni solishtirish uchun «Kunlik» ni tanlang.</>}</div>
         </div></>)}
       {st.send && data && <SendModal a={data.a} b={data.b} mode={mode} onClose={() => st.setSend(false)} />}

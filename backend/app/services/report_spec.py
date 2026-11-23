@@ -82,7 +82,7 @@ TABLES["r1"] = {**TABLES["konsentrator"], "short": "Konsentratorlar", "cols": [
     n("c0", "b"), n("c1", "b"), n("c2", "green"), n("c3", "red"), n("c4", "red"), d("c4", "bad"),
     n("c5", "red"), d("c5", "bad"), n("c6", "red"), d("c6", "bad"), n("c7", "red"), d("c7", "bad"),
     n("c8", "red"), d("c8", "mid"), n("c9", "b"), d("c9", "good"), n("c10", "red")]}
-TABLES["r2"] = {
+TABLES["r2o"] = {
     "title": "hududida CAS dasturida aloqaga chiqmagan hisoblagichlar bo'yicha", "short": "Aloqaga chiqmagan",
     "head": [
         [H("Hudud nomi", 4, 1), H("Aloqaga chiqqan hisoblagichlar soni", 4, 1, "vert green"),
@@ -95,6 +95,20 @@ TABLES["r2"] = {
     "cols": [n("c0", "green b"), n("c1", "red b"), t("t2"), d("c1", "bad"), n("c3", "b"), d("c3", "bad"),
              n("c4", "b"), d("c4", "bad"), n("c5", "amber"), d("c5", "bad"), n("c6", "b"), d("c6", "bad"),
              n("c7", "b"), d("c7", "bad"), n("c8", "b"), d("c8", "bad")]}
+# Yangi PDF'larda (2-sahifa) oxirida «Billingda otkl. status» ustuni bor (↑↓ siz). Eski PDF'larda — r2o.
+TABLES["r2"] = {
+    "title": "hududida CAS dasturida aloqaga chiqmagan hisoblagichlar bo'yicha", "short": "Aloqaga chiqmagan",
+    "head": [
+        [H("Hudud nomi", 4, 1), H("Aloqaga chiqqan hisoblagichlar soni", 4, 1, "vert green"),
+         H("Aloqadan chiqib ketgan hisoblagichlar soni", 1, 15, "red"), H("Billingda\n[otkl. status]", 4, 1)],
+        [H("Jami", 1, 3), H("Iste'molchi turi kesimida", 1, 6, "it"), H("Vaqtlar kesimida", 1, 6, "it")],
+        [H("soni", 2, 1, "red s"), H("%", 2, 1, "s"), H("↑↓", 2, 1, "arr"), H("Aholi", 1, 2, "green"),
+         H("Ulgurji", 1, 2, "blue"), H("Balans", 1, 2, "amber"), H("7-30 kun", 1, 2), H("1-3 oy", 1, 2),
+         H("3 oydan ortiq", 1, 2)],
+        _S4(6)],
+    "cols": [n("c0", "green b"), n("c1", "red b"), t("t2"), d("c1", "bad"), n("c3", "b"), d("c3", "bad"),
+             n("c4", "b"), d("c4", "bad"), n("c5", "amber"), d("c5", "bad"), n("c6", "b"), d("c6", "bad"),
+             n("c7", "b"), d("c7", "bad"), n("c8", "b"), d("c8", "bad"), n("c9", "b")]}
 TABLES["r3"] = {
     "title": "hududida CAS dasturida tarmoqdan uzilgan hisoblagichlar bo'yicha", "short": "Tarmoqdan uzilgan",
     "head": [
@@ -157,6 +171,21 @@ TABLES["r8"] = {
              n("c7", "amber b"), d("c7", "bad"), n("c8", "green b"), d("c8", "bad"), n("c9", "blue b"),
              n("c10", "blue b")]}
 
+def republic_key(page: int, ncells: int) -> str:
+    """Respublika sahifasi uchun jadval kaliti: PDF versiyasiga (katak soniga) qarab."""
+    key = REPUBLIC[page][0]
+    if key == "r2" and ncells == 9:
+        return "r2o"
+    return key
+
+
+def plain(label: str) -> str:
+    """Rang belgilari ({ko'k}, [qizil]) olib tashlangan matn; qator uzilishi — bo'shliq."""
+    for ch in "{}[]":
+        label = label.replace(ch, "")
+    return label.replace("\n", " ")
+
+
 # pol: o'sish / kamayish ranglari
 POL = {"bad": ("red", "blue"), "mid": ("blue", "red"), "good": ("green", "red")}
 # Namuna (Excel) hisobotidagi ranglar: oq fon, qora chegara, och ko'k sarlavha, och sariq "Jami" qatori
@@ -179,7 +208,7 @@ HEAD_H = {"obxod": H3A, "r6": H3A, "r4": H3B, "r7": H3B}
 TOTAL_H, ROW_H = 18.6, 13.44
 # Och sariq (cream) ustunlar: tanlangan «soni» ustunlari (cols ichidagi 1-asosli tartib raqami)
 _K = {7, 9, 11, 13, 15}
-CREAM_COLS = {"konsentrator": _K, "r1": _K, "aloqa": {1, 10, 12, 14, 16}, "r2": {2, 11, 13, 15},
+CREAM_COLS = {"konsentrator": _K, "r1": _K, "aloqa": {1, 10, 12, 14, 16}, "r2": {2, 11, 13, 15}, "r2o": {2, 11, 13, 15},
               "r3": {2, 5, 7, 9}, "r4": {7}}
 PINK_TABLES = {"obxod", "r6"}
 

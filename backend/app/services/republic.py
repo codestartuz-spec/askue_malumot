@@ -158,7 +158,7 @@ LABELS = {
     1: ["Dasturda mavjud transformatorlar", "CAS ga yuklangan", "Online", "Offline", "Shundan 3 kundan ortiq offline",
         "Obxod 0%", "Obxod 1-30%", "Obxod 30-50%", "Obxod 50-80%", "Obxod 80-100%", "Hisoblagichi biriktirilmagan"],
     2: ["Aloqaga chiqqan hisoblagichlar", "Aloqadan chiqib ketgan — jami", "%", "Aholi", "Ulgurji", "Balans",
-        "7-30 kun", "1-3 oy", "3 oydan ortiq"],
+        "7-30 kun", "1-3 oy", "3 oydan ortiq", "Billingda otkl. status"],
     3: ["Aloqaga chiqqan hisoblagichlar", "Tarmoqdan uzilgan — jami", "%", "4-7 kun", "7-30 kun", "30 kundan ortiq",
         "To'g'ridan-to'g'ri ulanish (peremichka)"],
     4: ["Loyiha doirasida", "CAS ga yuklangan", "Bir marta obxod olgan", "Umuman obxod olmagan",
@@ -177,8 +177,22 @@ LABELS = {
 }
 
 
+# Sahifa tuzilishi PDF versiyasiga qarab o'zgargan bo'lishi mumkin: 2-sahifaga oxirida «Billingda otkl. status»
+# ustuni qo'shilgan (yangi PDF'larda 10 ta katak, eskilarida 9 ta). Yangi ustun doim OXIRGI — shuning uchun
+# eski va yangi PDF'ni birinchi 9 ta katak bo'yicha solishtirish mumkin.
+VARIANTS = {2: {9: "old", 10: "new"}}
+COMPAT = {2: {9, 10}}
+
+
+def comparable(page: int, a: int, b: int) -> bool:
+    """Ikki PDF'dagi sahifa kataklarini tartib raqami bo'yicha solishtirish mumkinmi."""
+    return a == b or (a in COMPAT.get(page, ()) and b in COMPAT.get(page, ()))
+
+
 def label_for(page: int, idx: int, count: int, end: date | None, fallback: str) -> str:
     lab = LABELS.get(page)
+    if lab and page in VARIANTS and count in VARIANTS[page]:
+        lab = lab[:count]                     # eski variant: oxirgi (yangi) ustun yo'q
     if not lab or len(lab) != count:
         return fallback
     t = lab[idx]
@@ -205,9 +219,13 @@ def parse_report(data: bytes) -> dict:
     return r
 
 
-def page_values(cells: list[dict], other: list[dict] | None) -> tuple[dict, dict]:
+def page_values(cells: list[dict], other: list[dict] | None, strict: bool = False) -> tuple[dict, dict]:
     """Sahifa katak ro'yxatidan (cur, base) lug'atlari. PDF'dagi ↑↓ foiz katagidan keyin turadi — u oldingi
-    sonli katakka tegishli. other berilsa — dinamika shu sana bilan solishtiriladi."""
+    sonli katakka tegishli.
+
+    strict=False (oy boshidan): dinamika PDF'ning o'z ↑↓ qiymatlaridan olinadi (oy boshiga nisbatan).
+    strict=True  (kunlik): dinamika = joriy son − `other` (tanlangan boshqa sana) soni. `other` yo'q bo'lsa
+    dinamika bo'sh qoladi — PDF'ning oy boshidagi ↑↓ qiymati kunlik farq sifatida ko'rsatilmaydi."""
     n = len(cells)
     d = [c.get("d") for c in cells]
     for i, c in enumerate(cells):
@@ -216,14 +234,14 @@ def page_values(cells: list[dict], other: list[dict] | None) -> tuple[dict, dict
                 d[i - 1] = d[i]
             d[i] = None
     cur, base = {}, {}
-    use_other = other is not None and len(other) == n
     for i, c in enumerate(cells):
         v = c.get("v") or 0
         cur[f"c{i}"] = v
         if c.get("p"):
             cur[f"t{i}"] = c["p"]
-        if use_other:
-            base[f"c{i}"] = other[i].get("v") or 0
+        if strict:
+            # yangi ustun (eski PDF'da yo'q) yoki `other` topilmasa — farq yo'q (base = cur)
+            base[f"c{i}"] = (other[i].get("v") or 0) if other is not None and i < len(other) else v
         else:
             base[f"c{i}"] = v - (d[i] or 0)
     return cur, base
@@ -232,7 +250,7 @@ def page_values(cells: list[dict], other: list[dict] | None) -> tuple[dict, dict
 def spec_json(key: str) -> dict:
     from . import report_spec as S
     cfg = S.TABLES[key]
-    head = [[{"l": l, "rs": rs, "cs": cs, "c": c} for (l, rs, cs, c) in row] for row in cfg["head"]]
+    head = [[{"l": S.plain(l), "rs": rs, "cs": cs, "c": c} for (l, rs, cs, c) in row] for row in cfg["head"]]
     cols = []
     for c in cfg["cols"]:
         if c[0] == "n":
@@ -245,21 +263,29 @@ def spec_json(key: str) -> dict:
 
 
 def compare(a: dict | None, b: dict, base_iso: str, to_iso: str) -> list[dict]:
-    """Har sahifa: spetsifikatsiya + viloyat jami qatori (cur) va solishtirish (base)."""
+    """Har sahifa: spetsifikatsiya + viloyat jami qatori (cur) va solishtirish (base).
+
+    a berilsa (kunlik) — farq = b sanasi − a sanasi (har ikkala PDF'ning o'z sonlari). a yo'q bo'lsa — PDF'ning
+    oy boshiga nisbatan ↑↓ qiymatlari."""
     from . import report_spec as S
     pa = {p["n"]: p for p in (a or {}).get("pages", [])}
+    strict = a is not None
     res = []
     for p in b["pages"]:
         if p["n"] not in S.REPUBLIC:
             continue
-        key = S.REPUBLIC[p["n"]][0]
-        old = pa.get(p["n"])
-        cur, base = page_values(p["cells"], old["cells"] if old else None)
+        key = S.republic_key(p["n"], len(p["cells"]))
+        old = pa.get(p["n"]) if strict else None
+        warn = ""
+        if strict and (old is None or not comparable(p["n"], len(old["cells"]), len(p["cells"]))):
+            warn = "Bu sahifa tanlangan sanalar PDF'larida har xil tuzilgan — farqni hisoblab bo'lmadi"
+            old = None
+        cur, base = page_values(p["cells"], old["cells"] if old else None, strict)
         old_rows = {r["name"]: r["cells"] for r in (old or {}).get("rows", [])}
         rows = []
         for i, r in enumerate(p.get("rows", [])):
-            rc, rb = page_values(r["cells"], old_rows.get(r["name"]) if old else None)
+            rc, rb = page_values(r["cells"], old_rows.get(r["name"]), strict)
             rows.append({"id": i + 1, "name": r["name"], "cur": rc, "base": rb})
         res.append({"n": p["n"], "key": key, **spec_json(key), "cur": cur, "base": base, "rows": rows,
-                    "to": to_iso, "from": base_iso})
+                    "to": to_iso, "from": base_iso, "warn": warn})
     return res
