@@ -267,7 +267,11 @@ def chats(_: User = Depends(need_any("daily.send", "daily.settings")), db: Sessi
 
 @router.get("/{bid}")
 def detail(bid: int, _: User = Depends(need("daily.view")), db: Session = Depends(get_db)):
-    return _row(_get(db, bid), True)
+    b = _get(db, bid)
+    # Eski versiyada tayyorlangan kun (rasm va 7 ta fayl yo'q) — asl fayllar bor bo'lsa, o'zi qayta tayyorlanadi
+    if b.status == "done" and not (_dir(b.task_date) / "out" / "img1.png").exists() and (_dir(b.task_date) / "orig").exists():
+        _requeue(db, b)
+    return _row(b, True)
 
 
 def _out_file(b: DailyBatch, which: str) -> tuple[str, bytes, str]:

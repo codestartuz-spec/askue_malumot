@@ -197,6 +197,18 @@ def test_full_flow_tables_and_files(client, ops):
     assert client.get(f"/api/daily/{d['id']}", headers=ops).status_code == 404
 
 
+def test_old_batch_is_rebuilt_when_opened(client, ops):
+    import shutil
+    d = _wait(client, ops, _post(client, ops, make_files(), day="2026-11-17").json()["id"])
+    out = D.folder(date(2026, 11, 17)) / "out"
+    for f in out.iterdir():                                       # eski versiya: faqat t1, t2, task
+        if f.name not in ("t1.xlsx", "t2.xlsx", "task.xlsx"):
+            f.unlink()
+    again = _wait(client, ops, client.get(f"/api/daily/{d['id']}", headers=ops).json()["id"])
+    assert again["status"] == "done" and [x["k"] for x in again["outs"]][:2] == ["img1", "img2"] and len(again["outs"]) == 12
+    client.delete(f"/api/daily/{d['id']}", headers=ops)
+
+
 def test_upload_validation_and_permissions(client, ops, make_user):
     f = make_files()
     names = list(f)
