@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import current_user, log, need
 from ..models import User
+from ..services import filenames as FN
 from ..settings_store import DEFAULTS, SCHEMA, app_cfg, app_cfg_all, set_cfg
 
 router = APIRouter(prefix="/appsettings", tags=["appsettings"])
@@ -16,7 +17,15 @@ router = APIRouter(prefix="/appsettings", tags=["appsettings"])
 @router.get("")
 def get_all(_: User = Depends(need("settings.manage"))):
     cur = app_cfg_all()
-    return [{"key": k, "label": lbl, "default": d, "group": g, "type": t, "value": cur[k]} for k, lbl, d, g, t in SCHEMA]
+    region = cur["region_name"]
+    out = []
+    for k, lbl, d, g, t in SCHEMA:
+        it = {"key": k, "label": lbl, "default": d, "group": g, "type": t, "value": cur[k]}
+        if t == "filename":
+            it["placeholders"] = {n: FN.PLACEHOLDERS[n] for n in sorted(FN.ALLOWED[k], key=list(FN.PLACEHOLDERS).index)}
+            it["example"] = FN.preview(k, cur[k], region)
+        out.append(it)
+    return out
 
 
 @router.get("/public")
@@ -26,6 +35,18 @@ def public(_: User = Depends(current_user)):
 
 class CfgIn(BaseModel):
     values: dict[str, str]
+
+
+class PreviewIn(BaseModel):
+    key: str
+    value: str
+
+
+@router.post("/preview")
+def preview(body: PreviewIn, _: User = Depends(need("settings.manage"))):
+    """Fayl nomi shabloni uchun namuna (saqlamasdan)."""
+    err = FN.validate(body.key, body.value)
+    return {"ok": err is None, "error": err or "", "name": FN.preview(body.key, body.value, app_cfg("region_name")) if not err else ""}
 
 
 @router.put("")
@@ -41,6 +62,8 @@ def put_all(body: CfgIn, me: User = Depends(need("settings.manage")), db: Sessio
             raise HTTPException(400, "Qiymat juda uzun")
         if types[k] == "date" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             raise HTTPException(400, "Sana YYYY-MM-DD ko'rinishida bo'lsin")
+        if types[k] == "filename" and (err := FN.validate(k, v)):
+            raise HTTPException(400, f"«{k}»: {err}")
     for k, v in body.values.items():
         set_cfg(k, v)
     log(db, me.username, "sozlama", ", ".join(body.values))

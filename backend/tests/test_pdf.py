@@ -225,3 +225,40 @@ def test_republic_send_kunlik_files(client, make_user, fake_tg):
         time.sleep(0.2)
     assert st.json()["status"] == "done", st.json()
     assert len([s for s in fake_tg if s[0] == "-100888"]) == 3
+    assert not any(fake_tg.captions)                      # faqat fayl — izohsiz
+    names = sorted(s[1] for s in fake_tg if s[0] == "-100888")
+    assert "Respublika_dinamikasi_2026-11-23.pdf" in names and "Respublika_dinamikasi_2026-11-23.xlsx" in names
+
+
+def test_filename_templates_settings_and_downloads(client, make_user):
+    from urllib.parse import quote
+    _, h = make_user(["settings.manage", "republic.upload", "republic.view", "report.download", "republic.original"])
+    client.post("/api/republic/upload", files=_files(REP_NEW), headers=h)
+    items = {x["key"]: x for x in client.get("/api/appsettings", headers=h).json()}
+    assert items["fn_republic"]["type"] == "filename" and items["fn_republic"]["example"].endswith(".pdf")
+    assert "sana" in items["fn_republic"]["placeholders"] and "nom" not in items["fn_republic"]["placeholders"]
+    # noto'g'ri shablonlar rad etiladi
+    for k, v in (("fn_republic", "{nom}"), ("fn_republic", "a{b"), ("fn_republic", ""), ("fn_ag", "{yo'q}")):
+        assert client.put("/api/appsettings", json={"values": {k: v}}, headers=h).status_code == 400, (k, v)
+    pv = client.post("/api/appsettings/preview", json={"key": "fn_republic", "value": "Resp {sana_dmy}"}, headers=h).json()
+    assert pv == {"ok": True, "error": "", "name": "Resp 23.11.2026.pdf"}
+    assert not client.post("/api/appsettings/preview", json={"key": "fn_ag", "value": "{nom}"}, headers=h).json()["ok"]
+    try:
+        r = client.put("/api/appsettings", json={"values": {"fn_republic": "Resp {sana_dmy}", "fn_republic_orig": "Asl_{yil}-{oy}-{kun}"}}, headers=h)
+        assert r.status_code == 200, r.text
+        d = client.get("/api/republic/download?fmt=xlsx&b=2026-11-23", headers=h)
+        assert quote("Resp 23.11.2026.xlsx") in d.headers["content-disposition"]
+        d = client.get("/api/republic/download?fmt=orig&b=2026-11-23", headers=h)
+        assert "Asl_2026-11-23.pdf" in d.headers["content-disposition"]
+    finally:
+        client.put("/api/appsettings", json={"values": {"fn_republic": "Respublika_dinamikasi_{sana}", "fn_republic_orig": "{asl}"}}, headers=h)
+
+
+def test_filename_render_is_safe():
+    from app.services import filenames as F
+    ctx = F.context("2026-11-23", "2026-11-01", hudud="Qashqadaryo hududiy filiali", nom="Ko‘kdala t.")
+    assert F.render("Dinamika_{nom}_{sana}", ctx, "pdf") == "Dinamika_Kokdala_t_2026-11-23.pdf"
+    out = F.render("../../{hudud}", ctx, "pdf")
+    assert "/" not in out and "\\" not in out and out.endswith(".pdf")
+    assert F.render("{asl}", F.context("2026-11-23"), "pdf", "Zaxira") == "Zaxira.pdf"      # bo'sh natija → zaxira nom
+    assert len(F.render("x" * 500, ctx, "pdf")) <= F.MAX_LEN + 4

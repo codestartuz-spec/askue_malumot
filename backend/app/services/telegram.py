@@ -99,8 +99,11 @@ def send_text(chat_id: str, msg: str, html_mode: bool = False, **kw) -> dict:
     return call("sendMessage", {"chat_id": chat_id, "text": msg[:4096], **kw})
 
 
-def send_file(chat_id: str, filename: str, data: bytes, caption: str = "", markup: str | None = None) -> dict:
-    params = {"chat_id": chat_id, "caption": caption[:1000]}
+def send_file(chat_id: str, filename: str, data: bytes, markup: str | None = None, caption: str = "") -> dict:
+    """Hisobot fayli — izohsiz (faqat fayl). caption faqat zaxira nusxasi kabi ichki xabarlar uchun."""
+    params = {"chat_id": chat_id}
+    if caption:
+        params["caption"] = caption[:1000]
     if markup:
         params["reply_markup"] = markup
     return call("sendDocument", params, files={"document": (filename, data)}, timeout=(15, 180))

@@ -157,3 +157,8 @@ login/IP/qurilma, PDF, shifrlash, Redis/navbat, migratsiya, audit va yuborish ja
 
 **Bog'liqliklar.** `requirements.txt` va `package.json` aniq versiyalarga qulflangan; Dependabot haftalik PR ochadi; CI'da
 `pip-audit` va `npm audit` bor.
+
+### v11 — fayl nomlari va izohsiz yuborish
+- Telegramga hisobot fayllari **faqat fayl** sifatida yuboriladi (izoh/caption yo'q). Zaxira nusxasi sadminga alohida izoh bilan ketadi.
+- Fayl nomlari Sozlamalar → Umumiy sozlamalar → «Fayl nomlari» bo'limida shablon bilan o'zgartiriladi (`{hudud} {nom} {sana} {sana_dmy} {dan} {dan_dmy} {yil} {oy} {kun} {asl}`). Kengaytma avtomatik; taqiqlangan belgilar olib tashlanadi. Kod: `backend/app/services/filenames.py`.
+- Respublika 2-sahifa: yangi «Billingda otkl. status» ustuni («soni» katagi bilan); eski PDF'lar ustunsiz ko'rinadi.

@@ -48,8 +48,8 @@ class Kind:
     default_start: Callable[[date], date]
     compare: Callable[[dict | None, dict, str, str], object]
     view: Callable[[object, date | None, date, date], dict]
-    render: Callable[[object, str, date | None, date, date], tuple[str, bytes, str]]
-    orig: Callable[[date, date, str | None], tuple[str, str]]   # (bd, start, saqlangan_nom) → (fayl nomi, izoh)
+    render: Callable[[object, str, date | None, date, date], tuple[str, bytes]]       # → (fayl nomi, mazmun)
+    orig: Callable[[date, date, str | None], str]                                    # (bd, start, saqlangan_nom) → fayl nomi
     router: APIRouter = field(default=None)
 
     @property
@@ -88,15 +88,14 @@ class Kind:
                            bb.end_date.isoformat())
         return res, (aa.end_date if aa else None), bb.end_date, start
 
-    def make_file(self, db, fmt, a, b, mode="oy") -> tuple[str, bytes, str]:
+    def make_file(self, db, fmt, a, b, mode="oy") -> tuple[str, bytes]:
         res, ad, bd, start = self.build(db, a, b, mode)
         if fmt == "orig":
             f = self.file(bd)
             if not f.exists():
                 raise HTTPException(404, "Asl PDF fayl serverda topilmadi — shu sanani qayta yuklang")
             rep = db.scalar(select(self.model).where(self.model.end_date == bd))
-            default, cap = self.orig(bd, start, rep.filename if rep else None)
-            return default, f.read_bytes(), cap
+            return self.orig(bd, start, rep.filename if rep else None), f.read_bytes()
         return self.render(res, fmt, ad, bd, start)
 
 
@@ -186,7 +185,7 @@ def make_router(kind: Kind) -> APIRouter:
         if fmt not in MIME:
             raise HTTPException(400, "Noto'g'ri format")
         _guard_orig(kind, user, [fmt])
-        name, blob, _c = kind.make_file(db, fmt, a, b, mode)
+        name, blob = kind.make_file(db, fmt, a, b, mode)
         return Response(blob, media_type=MIME[fmt],
                         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
 
@@ -229,7 +228,7 @@ def run_send(kind_key: str, job_id: int, fmts, chats, a, b, post_id: int = 0, pi
         for fmt in fmts:
             try:
                 with SessionLocal() as db:
-                    name, blob, cap = kind.make_file(db, fmt, a, b, mode)
+                    name, blob = kind.make_file(db, fmt, a, b, mode)
             except HTTPException as e:
                 lines.append(f"✗ {fmt}: {e.detail}")
                 fails += len(chats)
@@ -242,7 +241,7 @@ def run_send(kind_key: str, job_id: int, fmts, chats, a, b, post_id: int = 0, pi
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
                 try:
-                    res = tg.send_file(chat_id, name, blob, cap, P.markup(iid) if (ack and is_last and iid) else None)
+                    res = tg.send_file(chat_id, name, blob, P.markup(iid) if (ack and is_last and iid) else None)
                     last_mid[str(chat_id)] = res.get("message_id")
                     lines.append(f"✓ {name} → {title}")
                 except tg.TgError as e:

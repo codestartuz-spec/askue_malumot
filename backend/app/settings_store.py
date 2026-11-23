@@ -3,6 +3,7 @@ Redis/xotirada 60 soniya keshlanadi. Sozlamalar sahifasidan o'zgartiriladi."""
 from sqlalchemy import text
 
 from .db import engine, upsert_kv
+from .services.filenames import FILES
 from .store import get_store
 
 SCHEMA = [
@@ -12,6 +13,7 @@ SCHEMA = [
     ("ag_title", "AG hisobot sarlavhasi", "24.02.2023 dagi № 01-04-42-22 sonli topshiriq ijrosi bo'yicha", "AG dinamikasi", "text"),
     ("ag_start_date", "AG boshlang'ich sana (PDF o'zida bo'lmasa)", "2023-02-20", "AG dinamikasi", "date"),
 ]
+SCHEMA += [(k, lbl, d, "Fayl nomlari", "filename") for k, lbl, d, _p in FILES]
 DEFAULTS = {k: d for k, _l, d, _g, _t in SCHEMA}
 TTL = 60
 

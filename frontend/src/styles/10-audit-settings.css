@@ -9,3 +9,13 @@
 .pager-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .set-group{margin:6px 0 14px}
 .set-group h4{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#5f6f86}
+
+/* Sozlamalar: fayl nomi shablonlari */
+.fn-field .fn-row { display: flex; gap: 8px; align-items: center; }
+.fn-field .fn-row input { flex: 1; }
+.fn-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.fn-chip { border: 1px solid var(--line, #d5dbe8); background: #f3f6fc; color: #1d4ed8; border-radius: 6px; padding: 2px 8px; font: 600 12px/1.6 ui-monospace, Consolas, monospace; cursor: pointer; }
+.fn-chip:hover { background: #e3ebfb; }
+.fn-ex { margin-top: 6px; font-size: 13px; color: #475569; word-break: break-all; }
+.fn-ex.bad { color: #b91c1c; font-weight: 600; }
+.fn-help { margin: 0 0 8px; font-size: 13px; }

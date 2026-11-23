@@ -1,10 +1,12 @@
 """AG dinamikasi: Respublika bilan bir xil jarayon (umumiy fabrika: pdf_reports.py)."""
+import re
 from datetime import date
 
 from fastapi import HTTPException
 
 from ..models import AgReport
 from ..services import ag as A
+from ..services import filenames as FN
 from ..settings_store import app_cfg
 from .pdf_reports import Kind, Parsed, make_router
 
@@ -18,13 +20,12 @@ def _parse(rep: dict, _filename: str) -> Parsed:
 def _render(res, fmt, ad, bd, start):
     from ..services import ag_report as AR
     blob = (AR.build_pdf if fmt == "pdf" else AR.build_xlsx)(res)
-    return (f"AG_dinamikasi_{bd.isoformat()}.{fmt}", blob,
-            f"📊 AG dinamikasi — {res['region']}\n📅 {(ad or start):%d.%m.%Y} – {bd:%d.%m.%Y}")
+    return FN.file_name("fn_ag", fmt, bd, ad or start, hudud=res["region"]), blob
 
 
 def _orig(bd, start, saved):
-    return (saved or f"Qashqadaryo_HETK_AG_{bd.isoformat()}.pdf",
-            f"📄 AG dinamikasi (asl nusxa)\n📅 {start:%d.%m.%Y} – {bd:%d.%m.%Y}")
+    return FN.file_name("fn_ag_orig", "pdf", bd, start, hudud=app_cfg("ag_region"),
+                        asl=re.sub(r"\.pdf$", "", saved or "", flags=re.I) or "Qashqadaryo_HETK_AG")
 
 
 KIND = Kind(

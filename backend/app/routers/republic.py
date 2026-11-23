@@ -8,6 +8,7 @@ from sqlalchemy import select
 from ..config import settings
 from ..db import SessionLocal
 from ..models import RepublicReport
+from ..services import filenames as FN
 from ..services import republic as R
 from ..settings_store import app_cfg
 from .pdf_reports import MIME, Kind, Parsed, SendIn, make_router  # noqa: F401  (MIME/SendIn boshqa joylar uchun)
@@ -36,13 +37,11 @@ def _render(pages, fmt, ad, bd, start):
     items = [(p["key"], {"rows": p["rows"], "total": {"cur": p["cur"], "base": p["base"]}, "base": p["from"], "to": p["to"]})
              for p in pages]
     blob = (RP.build_pdf if fmt == "pdf" else RP.build_xlsx)(items, app_cfg("region_name"), "Hudud nomi")
-    return (f"Respublika_dinamikasi_{bd.isoformat()}.{fmt}", blob,
-            f"📊 Respublika dinamikasi — {app_cfg('region_name')}\n📅 {(ad or start):%d.%m.%Y} – {bd:%d.%m.%Y}")
+    return FN.file_name("fn_republic", fmt, bd, ad or start), blob
 
 
 def _orig(bd, start, saved):
-    return (saved or f"Qashqadaryo_HETK_dynamic_{bd.isoformat()}.pdf",
-            f"📄 Respublika dinamikasi (asl nusxa)\n📅 {bd.replace(day=1):%d.%m.%Y} – {bd:%d.%m.%Y}")
+    return FN.file_name("fn_republic_orig", "pdf", bd, start, asl=re.sub(r"\.pdf$", "", saved or "", flags=re.I) or "Qashqadaryo_HETK_dynamic")
 
 
 KIND = Kind(

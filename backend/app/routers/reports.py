@@ -1,4 +1,3 @@
-import re
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +13,7 @@ from ..settings_store import app_cfg
 from ..tasks import submit, task
 from ..deps import has_perm, log, need
 from ..models import User
+from ..services import filenames as FN
 from ..services import reports as R
 from ..services import telegram as tg
 from ..services.dyn import compute
@@ -24,10 +24,6 @@ VIEW = {"konsentrator": "view.konsentrator", "aloqa": "view.aloqa", "obxod": "vi
 MIME = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 
-def _slug(s: str) -> str:
-    return re.sub(r"[^0-9A-Za-z]+", "_", s.replace("‘", "").replace("’", "").replace("'", "")).strip("_") or "hisobot"
-
-
 def allowed_tables(user: User) -> list[str]:
     t = [k for k, perm in VIEW.items() if has_perm(user, perm)]
     if not t:
@@ -36,7 +32,7 @@ def allowed_tables(user: User) -> list[str]:
 
 
 def make_report(db: Session, kind: str, esp_id: int | None, fmt: str, df: str | None, dt: str | None,
-                tables: list[str], can_cmp: bool) -> tuple[str, bytes, str]:
+                tables: list[str], can_cmp: bool) -> tuple[str, bytes]:
     if kind == "district":
         row = db.execute(text("SELECT label FROM esps WHERE id=:i"), {"i": esp_id}).first()
         if not row:
@@ -50,9 +46,11 @@ def make_report(db: Session, kind: str, esp_id: int | None, fmt: str, df: str | 
     data = items[0][1]
     fn = R.build_pdf if fmt == "pdf" else R.build_xlsx
     blob = fn(items, scope, first)
-    name = f"Dinamika_{_slug(scope)}_{data['to']}.{fmt}"
-    caption = f"📊 {scope} — dinamika\n📅 {R.period(data)}"
-    return name, blob, caption
+    if kind == "district":
+        name = FN.file_name("fn_daily_district", fmt, data["to"], data.get("base"), nom=scope)
+    else:
+        name = FN.file_name("fn_daily_region", fmt, data["to"], data.get("base"), hudud=scope)
+    return name, blob
 
 
 @router.get("/download")
@@ -61,7 +59,7 @@ def download(kind: str = "region", fmt: str = "pdf", esp_id: int | None = None,
              user: User = Depends(need("report.download")), db: Session = Depends(get_db)):
     if fmt not in MIME or kind not in ("region", "district"):
         raise HTTPException(400, "Noto'g'ri so'rov")
-    name, blob, _ = make_report(db, kind, esp_id, fmt, date_from, date_to, allowed_tables(user),
+    name, blob = make_report(db, kind, esp_id, fmt, date_from, date_to, allowed_tables(user),
                                 has_perm(user, "dynamics.compare"))
     return Response(blob, media_type=MIME[fmt], headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
@@ -102,7 +100,7 @@ def _run_send(job_id: int, items: list[dict], chats: list[tuple[str, str]], df, 
         for it in items:
             try:
                 with SessionLocal() as db:
-                    name, blob, caption = make_report(db, it.kind, it.esp_id, it.fmt, df, dt, tables, can_cmp)
+                    name, blob = make_report(db, it.kind, it.esp_id, it.fmt, df, dt, tables, can_cmp)
             except HTTPException as e:
                 lines.append(f"✗ {it.kind} {it.esp_id or ''} {it.fmt}: {e.detail}")
                 fails += len(chats)
@@ -115,7 +113,7 @@ def _run_send(job_id: int, items: list[dict], chats: list[tuple[str, str]], df, 
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
                 try:
-                    r = tg.send_file(chat_id, name, blob, caption, P.markup(iid) if (ack and is_last and iid) else None)
+                    r = tg.send_file(chat_id, name, blob, P.markup(iid) if (ack and is_last and iid) else None)
                     last_mid[str(chat_id)] = r.get("message_id")
                     lines.append(f"✓ {name} → {title}")
                 except tg.TgError as e:

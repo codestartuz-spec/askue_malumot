@@ -138,7 +138,7 @@ def send_to_sadmin(name: str, blob: bytes, kind: str = "auto") -> tuple[bool, st
     cap = f"🗄 ASKUE zaxira nusxasi\n📅 {datetime.now():%d.%m.%Y %H:%M} • {len(blob) / 1048576:.1f} MB • {'avtomatik' if kind == 'auto' else 'qo`lda'}"
     for cid, who in chats:
         try:
-            tg.send_file(cid, name, blob, cap)
+            tg.send_file(cid, name, blob, caption=cap)
             ok += 1
         except tg.TgError as e:
             errs.append(f"{who}: {e}")

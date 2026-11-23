@@ -82,8 +82,17 @@ def make_user(client, admin):
 def fake_tg(monkeypatch):
     """Telegramga haqiqiy so'rov yubormaydi: yuborilganlar ro'yxatini yig'adi."""
     from app.services import telegram as tg
-    sent = []
-    monkeypatch.setattr(tg, "send_file", lambda chat, name, blob, cap="", markup=None: (sent.append((chat, name, len(blob))) or {"message_id": 1}))
+    class Sent(list):
+        captions: list = []
+
+    sent = Sent()
+    sent.captions = []
+
+    def _send_file(chat, name, blob, markup=None, caption=""):
+        sent.append((chat, name, len(blob)))
+        sent.captions.append(caption)
+        return {"message_id": 1}
+    monkeypatch.setattr(tg, "send_file", _send_file)
     monkeypatch.setattr(tg, "send_post", lambda chat, msg, files, markup=None: (sent.append((chat, "msg", len(files))) or 1))
     monkeypatch.setattr(tg, "send_text", lambda chat, text_, *a, **k: sent.append((chat, "text", text_)))
     monkeypatch.setattr(tg, "get_token", lambda: "123:fake")
