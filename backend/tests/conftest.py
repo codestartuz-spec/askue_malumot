@@ -94,6 +94,7 @@ def fake_tg(monkeypatch):
         return {"message_id": 1}
     monkeypatch.setattr(tg, "send_file", _send_file)
     monkeypatch.setattr(tg, "send_photo", lambda chat, name, blob, markup=None: (sent.append((chat, name, len(blob))) or sent.captions.append("") or {"message_id": 2}))
+    monkeypatch.setattr(tg, "send_album", lambda chat, items: (sent.append((chat, "ALBUM:" + "+".join(n for n, _b in items), len(items))) or sent.captions.append("") or {"message_id": 3}))
     monkeypatch.setattr(tg, "send_post", lambda chat, msg, files, markup=None: (sent.append((chat, "msg", len(files))) or 1))
     monkeypatch.setattr(tg, "send_text", lambda chat, text_, *a, **k: sent.append((chat, "text", text_)))
     monkeypatch.setattr(tg, "get_token", lambda: "123:fake")

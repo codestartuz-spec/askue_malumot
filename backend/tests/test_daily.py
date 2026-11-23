@@ -293,7 +293,7 @@ def test_send_files_to_selected_chats(client, ops, fake_tg):
         time.sleep(0.2)
     assert st["status"] == "done", st
     sent = [s[1] for s in fake_tg if s[0] == "-100555"]            # tartib: avval 2 rasm, keyin 7 fayl
-    assert sent == ["Konsentratorlar_18.11.2026.png", "Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.png",
+    assert sent == ["ALBUM:Konsentratorlar_18.11.2026.png+Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.png",
                     "Offline_konsentratorlar_(3_kundan_ortiq)_18.11.2026.xlsx",
                     "Obxod_olish_darajasi_past_konsentratorlar_(0-50%)_18.11.2026.xlsx",
                     "Togridan_togri_ulanish_(Primichka)_18.11.2026.xlsx",
@@ -302,6 +302,14 @@ def test_send_files_to_selected_chats(client, ops, fake_tg):
                     "Aloqadan_chiqib_ketgan_hisoblagichlar_30-90_kun_18.11.2026.xlsx",
                     "Aloqadan_chiqib_ketgan_hisoblagichlar_90_kundan_ortiq_18.11.2026.xlsx"]
     assert not any(fake_tg.captions)                              # faqat fayl
+    # faqat bitta rasm tanlansa — albom emas, oddiy rasm
+    fake_tg.clear()
+    r = client.post(f"/api/daily/{d['id']}/send", json={"files": ["img2"], "chat_ids": [cid]}, headers=ops)
+    for _ in range(60):
+        if client.get(f"/api/reports/send/{r.json()['id']}", headers=ops).json()["status"] != "running":
+            break
+        time.sleep(0.2)
+    assert [s[1] for s in fake_tg if s[0] == "-100555"] == ["Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.png"]
     client.delete(f"/api/daily/{d['id']}", headers=ops)
 
 

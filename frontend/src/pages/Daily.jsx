@@ -88,7 +88,7 @@ function SendModal({ b, defaults, onClose }) {
             <label key={o.k} className={`opt ${files.has(o.k) ? 'on' : ''}`}><input type="checkbox" checked={files.has(o.k)} onChange={() => flip(setFiles, o.k)} disabled={busy} />
               <i>{o.ext === 'png' ? <ImageIcon size={20} /> : <FileSpreadsheet size={20} />}</i>
               <span><b>{o.title}</b><small>{o.ext === 'png' ? 'Rasm (jadval)' : `Excel fayl${o.rows != null ? ` · ${num(o.rows)} qator` : ''}${o.default ? '' : ' · qo\'shimcha'}`}</small></span></label>))}</div>
-          <small className="hint">Tartib: avval 2 ta jadval rasmi, keyin Excel fayllar. Faqat fayl yuboriladi (izohsiz).</small>
+          <small className="hint">Ikkala rasm tanlansa — bitta albom (karusel) bo'lib ketadi, keyin Excel fayllar. Izohsiz yuboriladi.</small>
         </div>
         <div>
           <div className="mp-sec dark">2. Qaysi kanal yoki guruhga</div>
@@ -336,7 +336,6 @@ export default function Daily() {
   const tabs = [{ k: 'yuklash', label: 'Fayl yuklash', icon: UploadCloud }, { k: 'arxiv', label: 'Arxiv', icon: Archive },
     ...(can('daily.settings') ? [{ k: 'sozlamalar', label: 'Sozlamalar', icon: Settings2 }] : [])]
   const tab = (tabs.find((t) => t.k === sp.get('t')) || tabs[0]).k
-  const titles = { t1_title: cfg?.t1_title || 'Konsentratorlar', t2_title: cfg?.t2_title || 'Aloqadan chiqib ketgan hisoblagichlar soni', task_title: cfg?.task_title || 'Kunlik topshiriq' }
   const defaults = cfg?.chats || {}
   if (!cfg) return <Spinner />
   return (

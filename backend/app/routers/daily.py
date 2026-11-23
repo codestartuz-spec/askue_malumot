@@ -371,7 +371,10 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
     last_mid: dict[str, int | None] = {}
     lines: list[str] = []
     done = fails = 0
-    total = len(files) * len(chats)
+    # Tanlangan 2 ta jadval rasmi bitta albom (karusel) bo'lib ketadi; qolgan fayllar alohida-alohida
+    pics = [f for f in files if f.startswith("img")]
+    units = ([pics] if len(pics) > 1 else []) + [[f] for f in files if f not in pics or len(pics) == 1]
+    total = len(units) * len(chats)
 
     def flush(st="running"):
         sendjobs.flush(job_id, st, done, total, lines)
@@ -379,30 +382,39 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
     lines.append(f"… Yuborish boshlandi: {len(files)} ta fayl → {len(chats)} ta kanal")
     flush()
     try:
-        for which in files:
+        for ui, unit in enumerate(units):
             try:
                 with SessionLocal() as db:
-                    name, blob, ext = _out_file(_get(db, bid), which)
+                    b = _get(db, bid)
+                    blobs = [_out_file(b, w) for w in unit]
             except HTTPException as e:
-                lines.append(f"✗ {which}: {e.detail}")
+                lines.append(f"✗ {', '.join(unit)}: {e.detail}")
                 fails += len(chats)
                 done += len(chats)
                 flush()
                 continue
+            label = f"{len(blobs)} ta jadval rasmi (albom)" if len(blobs) > 1 else blobs[0][0]
             if post_id:
-                P.add_file(post_id, name)
-            is_last = which == files[-1]
-            lines.append(f"… {name} yuborilmoqda")
+                for n, _b, _e in blobs:
+                    P.add_file(post_id, n)
+            is_last = ui == len(units) - 1
+            lines.append(f"… {label} yuborilmoqda")
             flush()
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
                 try:
                     mk = P.markup(iid) if (ack and is_last and iid) else None
-                    res = tg.send_photo(chat_id, name, blob, mk) if ext == "png" else tg.send_file(chat_id, name, blob, mk)
-                    last_mid[str(chat_id)] = res.get("message_id")
-                    lines.append(f"✓ {name} → {title}")
+                    if len(blobs) > 1:
+                        res = tg.send_album(chat_id, [(n, bl) for n, bl, _e in blobs])
+                        if mk:      # albomga tugma qo'yib bo'lmaydi — alohida qisqa xabar
+                            res = tg.send_text(chat_id, "👆 Yuqoridagi xabar bilan tanishib chiqing.", reply_markup=mk)
+                    else:
+                        n, bl, ext = blobs[0]
+                        res = tg.send_photo(chat_id, n, bl, mk) if ext == "png" else tg.send_file(chat_id, n, bl, mk)
+                    last_mid[str(chat_id)] = (res or {}).get("message_id")
+                    lines.append(f"✓ {label} → {title}")
                 except tg.TgError as e:
-                    lines.append(f"✗ {name} → {title}: {e}")
+                    lines.append(f"✗ {label} → {title}: {e}")
                     chat_err[str(chat_id)] = str(e)
                     fails += 1
                 if is_last and iid:

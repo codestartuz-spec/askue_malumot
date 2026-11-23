@@ -120,6 +120,22 @@ def send_photo(chat_id: str, filename: str, data: bytes, markup: str | None = No
         return send_file(chat_id, filename, data, markup)
 
 
+def send_album(chat_id: str, items: list[tuple[str, bytes]]) -> dict:
+    """2–10 ta rasm — bitta albom (karusel) ko'rinishida, izohsiz. Albom qabul qilinmasa — alohida rasmlar."""
+    try:
+        arr, fl = [], {}
+        for j, (name, data) in enumerate(items):
+            arr.append({"type": "photo", "media": f"attach://f{j}"})
+            fl[f"f{j}"] = (name, data, "image/png")
+        res = call("sendMediaGroup", {"chat_id": chat_id, "media": json.dumps(arr)}, files=fl, timeout=(15, 300))
+        return {"message_id": res[0].get("message_id") if isinstance(res, list) and res else None}
+    except TgError:
+        last = {}
+        for name, data in items:
+            last = send_photo(chat_id, name, data)
+        return last
+
+
 def _kind(mime: str) -> str:
     return "photo" if mime.startswith("image/") and mime != "image/gif" else "video" if mime.startswith("video/") else "document"
 
