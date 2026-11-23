@@ -187,7 +187,7 @@ def _requeue(db: Session, b: DailyBatch) -> None:
 
 
 @router.post("/{bid}/recompute")
-def recompute(bid: int, user: User = Depends(need("daily.upload")), db: Session = Depends(get_db)):
+def recompute(bid: int, user: User = Depends(need_any("daily.recompute", "daily.upload")), db: Session = Depends(get_db)):
     b = _get(db, bid)
     if b.status in ("queued", "running"):
         raise HTTPException(400, "Hozir ishlanmoqda")
@@ -203,7 +203,7 @@ class TypesIn(BaseModel):
 
 
 @router.post("/{bid}/types")
-def set_types(bid: int, body: TypesIn, user: User = Depends(need("daily.upload")), db: Session = Depends(get_db)):
+def set_types(bid: int, body: TypesIn, user: User = Depends(need_any("daily.recompute", "daily.upload")), db: Session = Depends(get_db)):
     """Tushunarsiz iste'molchi turlarining javobi: saqlanadi va keyingi yuklashlarda qayta so'ralmaydi."""
     b = _get(db, bid)
     if not body.map or any(v not in D.CATS for v in body.map.values()):
@@ -226,7 +226,7 @@ def listing(_: User = Depends(need("daily.view")), db: Session = Depends(get_db)
 def get_settings(_: User = Depends(need("daily.view"))):
     s = D.load_settings()
     return {**s, "placeholders": D.PLACEHOLDERS, "examples": D.names_example(s), "labels": D.edge_labels(s["time_edges"]),
-            "defaults": D.DEFAULTS}
+            "defaults": D.DEFAULTS, "list_titles": D.list_titles(s)}
 
 
 class SettingsIn(BaseModel):
@@ -242,6 +242,7 @@ class SettingsIn(BaseModel):
     fn_t2: str
     fn_task: str
     chats: dict[str, list[int]] = {}
+    titles: dict[str, str] = {}
 
 
 @router.put("/settings")
@@ -249,6 +250,8 @@ def put_settings(body: SettingsIn, user: User = Depends(need("daily.settings")),
     s = {**D.load_settings(), **body.model_dump()}
     s["esp_order"] = [e.strip() for e in s["esp_order"] if e.strip()]
     s["chats"] = {k: list(dict.fromkeys(s["chats"].get(k, []))) for k in GROUPS}
+    valid = {x["k"] for x in D.out_specs(s, True)}
+    s["titles"] = {k: v.strip() for k, v in (s.get("titles") or {}).items() if k in valid and v.strip()}
     for k in ("region", "t1_title", "t2_title", "task_title", "fn_t1", "fn_t2", "fn_task"):
         s[k] = s[k].strip()
     err = D.validate_settings(s)
@@ -257,7 +260,7 @@ def put_settings(body: SettingsIn, user: User = Depends(need("daily.settings")),
     D.save_settings(s)
     log(db, user.username, "kunlik_sozlama", "o'zgartirildi")
     db.commit()
-    return {**s, "examples": D.names_example(s), "labels": D.edge_labels(s["time_edges"])}
+    return {**s, "examples": D.names_example(s), "labels": D.edge_labels(s["time_edges"]), "list_titles": D.list_titles(s)}
 
 
 @router.get("/chats")
@@ -299,6 +302,8 @@ def get_file(bid: int, which: str, user: User = Depends(need("daily.view")), db:
         if not f.exists():
             raise HTTPException(404, "Asl fayl serverda topilmadi")
         return _attach((b.files.get(which) or {}).get("name") or f"{D.LABEL[which]}.xlsx", f.read_bytes())
+    if not has_perm(user, "daily.download"):
+        raise HTTPException(403, "Tayyor fayllarni yuklab olish uchun ruxsat yo'q")
     name, blob, ext = _out_file(b, which)
     return _attach(name, blob, MIME[ext])
 
@@ -317,6 +322,8 @@ def get_zip(bid: int, what: str, user: User = Depends(need("daily.view")), db: S
                 if f.exists():
                     z.write(f, (b.files.get(k) or {}).get("name") or f"{D.LABEL[k]}.xlsx")
         elif what == "out":
+            if not has_perm(user, "daily.download"):
+                raise HTTPException(403, "Tayyor fayllarni yuklab olish uchun ruxsat yo'q")
             for sp in D.out_specs(D.load_settings()):
                 if (_dir(b.task_date) / "out" / f"{sp['k']}.{sp['ext']}").exists():
                     n, blob, _e = _out_file(b, sp["k"])
@@ -379,7 +386,8 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
     def flush(st="running"):
         sendjobs.flush(job_id, st, done, total, lines)
 
-    lines.append(f"… Yuborish boshlandi: {len(files)} ta fayl → {len(chats)} ta kanal")
+    # log formati (Kunlik topshiriq oynasi o'qiydi): «belgi \t kalitlar \t kanal \t xato»; kalitlar — «img1+img2»
+    lines.append("…\t-\t-")
     flush()
     try:
         for ui, unit in enumerate(units):
@@ -388,17 +396,17 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
                     b = _get(db, bid)
                     blobs = [_out_file(b, w) for w in unit]
             except HTTPException as e:
-                lines.append(f"✗ {', '.join(unit)}: {e.detail}")
+                lines.append(f"✗\t{'+'.join(unit)}\t*\t{e.detail}")
                 fails += len(chats)
                 done += len(chats)
                 flush()
                 continue
-            label = f"{len(blobs)} ta jadval rasmi (albom)" if len(blobs) > 1 else blobs[0][0]
+            ukey = "+".join(unit)
             if post_id:
                 for n, _b, _e in blobs:
                     P.add_file(post_id, n)
             is_last = ui == len(units) - 1
-            lines.append(f"… {label} yuborilmoqda")
+            lines.append(f"…\t{ukey}\t-")
             flush()
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
@@ -412,9 +420,9 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
                         n, bl, ext = blobs[0]
                         res = tg.send_photo(chat_id, n, bl, mk) if ext == "png" else tg.send_file(chat_id, n, bl, mk)
                     last_mid[str(chat_id)] = (res or {}).get("message_id")
-                    lines.append(f"✓ {label} → {title}")
+                    lines.append(f"✓\t{ukey}\t{title}")
                 except tg.TgError as e:
-                    lines.append(f"✗ {label} → {title}: {e}")
+                    lines.append(f"✗\t{ukey}\t{title}\t{e}")
                     chat_err[str(chat_id)] = str(e)
                     fails += 1
                 if is_last and iid:
@@ -429,5 +437,5 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
                 P.item_done(iid, False, None, "Fayl tayyorlanmadi")
         flush("error" if fails and fails >= total else "done")
     except Exception as e:  # noqa: BLE001
-        lines.append(f"✗ Kutilmagan xato: {e}")
+        lines.append(f"✗\t-\t*\tKutilmagan xato: {e}")
         flush("error")

@@ -160,6 +160,7 @@ DEFAULTS = {
     "fn_t2": "{nom}_{sana_dmy}",
     "fn_task": "{nom}_{sana_dmy}",
     "chats": {"t1": [], "t2": [], "task": []},
+    "titles": {},          # ro'yxat fayllari nomlari (kalit → nom); bo'sh bo'lsa standart nom
 }
 
 
@@ -197,12 +198,18 @@ def validate_settings(s: dict) -> str | None:
         err = FN.validate("daily_" + tk, s.get(fk, ""))
         if err:
             return f"Fayl nomi ({tk}): {err}"
+    tt = s.get("titles") or {}
+    if not isinstance(tt, dict) or any(not isinstance(v, str) or not v.strip() or len(v) > 120 for v in tt.values()):
+        return "Fayl nomi bo'sh bo'lmasin (120 belgigacha)"
     if s.get("types") and not all(v in CATS for v in s["types"].values()):
         return "Iste'molchi turi noto'g'ri"
     return None
 
 
-def out_specs(s: dict) -> list[dict]:
+LIST_KEYS = ("off", "low", "prim")
+
+
+def out_specs(s: dict, defaults_only: bool = False) -> list[dict]:
     """Yuboriladigan/yuklab olinadigan natija fayllari (tartib = Telegramga yuborish tartibi).
     group — qaysi kanal/guruh ro'yxatidan standart tanlanadi; default — yuborish oynasida oldindan belgilanadimi."""
     n, lab = s["offline_days"], day_labels(s["time_edges"])
@@ -215,10 +222,22 @@ def out_specs(s: dict) -> list[dict]:
     ]
     sp += [{"k": f"nm{i}", "ext": "xlsx", "title": f"Aloqadan chiqib ketgan hisoblagichlar {l}", "tpl": "fn_task", "group": "task",
             "default": True} for i, l in enumerate(lab)]
+    if not defaults_only:      # Sozlamalarda o'zgartirilgan ro'yxat fayllari nomlari
+        over = s.get("titles") or {}
+        for x in sp:
+            if x["ext"] == "xlsx" and over.get(x["k"], "").strip():
+                x["title"] = over[x["k"]].strip()
     sp += [{"k": "t1", "ext": "xlsx", "title": s["t1_title"], "tpl": "fn_t1", "group": "t1", "default": False},
            {"k": "t2", "ext": "xlsx", "title": s["t2_title"], "tpl": "fn_t2", "group": "t2", "default": False},
            {"k": "task", "ext": "xlsx", "title": s["task_title"], "tpl": "fn_task", "group": "task", "default": False}]
     return sp
+
+
+def list_titles(s: dict) -> list[dict]:
+    """Sozlamalar uchun: 7 ta ro'yxat fayli — kalit, standart nom, joriy nom."""
+    cur = {x["k"]: x["title"] for x in out_specs(s)}
+    return [{"k": x["k"], "default": x["title"], "title": cur[x["k"]]} for x in out_specs(s, True)
+            if x["ext"] == "xlsx" and x["group"] == "task" and x["k"] != "task"]
 
 
 def spec_of(s: dict, which: str) -> dict | None:

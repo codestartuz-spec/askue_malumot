@@ -2,7 +2,7 @@
 // Tablar: Fayl yuklash · Arxiv · Sozlamalar (boshqa bo'limlardan mustaqil).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Archive, ArrowDown, ArrowUp, CheckCircle2, ClipboardList, Download, Eye, FileArchive, FileSpreadsheet, Image as ImageIcon, Loader2, Megaphone, Package, RefreshCw, Save, Send, Settings2, Trash2, UploadCloud, X, AlertTriangle, MailCheck } from 'lucide-react'
+import { Archive, ArrowDown, ArrowUp, CheckCircle2, ClipboardList, Clock, Download, Eye, FileArchive, FileSpreadsheet, Image as ImageIcon, Loader2, Megaphone, Package, RefreshCw, Save, Send, Settings2, Trash2, UploadCloud, X, AlertTriangle, MailCheck } from 'lucide-react'
 import { api, download, uploadForm } from '../api'
 import { useAuth } from '../auth'
 import { ChatTable, Confirm, Empty, Modal, Spinner, useToast } from '../ui'
@@ -46,15 +46,22 @@ function DailyTable({ tb, region, date }) {
 }
 
 /* ------------------------------------------------------------------ Telegramga yuborish */
+/* Yuborish jurnali: «belgi \t kalitlar \t kanal \t xato» (kalitlar: img1+img2) */
+const parseLog = (log = '') => log.split('\n').filter(Boolean).map((l) => { const [m, k, c, e] = l.split('\t'); return { m, k, c, e } })
+const mmss = (ms) => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`
+
 function SendModal({ b, defaults, onClose }) {
   const toast = useToast()
-  const [chats, setChats] = useState(null)
   const outs = b.outs || []
+  const [chats, setChats] = useState(null)
   const [files, setFiles] = useState(new Set(outs.filter((o) => o.default).map((o) => o.k)))
   const [sel, setSel] = useState(null)
   const [ack, setAck] = useState(false)
   const [job, setJob] = useState(null)
+  const [plan, setPlan] = useState(null)       // { units: [['img1','img2'], ['off'], ...], chats: [title, ...] }
   const [busy, setBusy] = useState(false)
+  const [t0, setT0] = useState(0)
+  const [now, setNow] = useState(0)
   const timer = useRef(null)
   useEffect(() => {
     api.get('/daily/chats').then((c) => { setChats(c); setSel(new Set(c.filter((x) => GROUPS.some((g) => (defaults[g.k] || []).includes(x.id))).map((x) => x.id))) })
@@ -62,46 +69,105 @@ function SendModal({ b, defaults, onClose }) {
     return () => clearInterval(timer.current)
   }, [])
   const flip = (setter, k) => setter((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n })
-  const go = async () => {
+  const byKey = Object.fromEntries(outs.map((o) => [o.k, o]))
+  const unitTitle = (u) => (u.length > 1 ? `Jadval rasmlari — ${u.length} ta (albom)` : byKey[u[0]]?.title || u[0])
+  const start = async (fileList, chatIds) => {
     setBusy(true)
     try {
-      const r = await api.post(`/daily/${b.id}/send`, { files: outs.map((o) => o.k).filter((k) => files.has(k)), chat_ids: [...sel], ack })
+      const ordered = outs.map((o) => o.k).filter((k) => fileList.includes(k))
+      const pics = ordered.filter((k) => k.startsWith('img'))
+      const units = [...(pics.length > 1 ? [pics] : []), ...ordered.filter((k) => !pics.includes(k) || pics.length === 1).map((k) => [k])]
+      const r = await api.post(`/daily/${b.id}/send`, { files: ordered, chat_ids: chatIds, ack })
+      setPlan({ units, chats: (chats || []).filter((c) => chatIds.includes(c.id)).map((c) => c.title) })
       setJob({ status: 'running', progress: 0, log: '' })
+      setT0(Date.now()); setNow(Date.now())
+      clearInterval(timer.current)
       timer.current = setInterval(async () => {
+        setNow(Date.now())
         try {
           const j = await api.get(`/reports/send/${r.id}`)
           setJob(j)
-          if (j.status !== 'running') { clearInterval(timer.current); setBusy(false); if (j.status === 'done') toast('Yuborish yakunlandi') }
-        } catch { /* */ }
-      }, 1200)
+          if (j.status !== 'running') {
+            clearInterval(timer.current); setBusy(false)
+            toast(j.status === 'done' ? 'Yuborish yakunlandi' : 'Yuborishda xatolar bor', j.status === 'done' ? undefined : 'err')
+          }
+        } catch { /* keyingi urinishda */ }
+      }, 1000)
     } catch (e) { toast(e.message, 'err'); setBusy(false) }
   }
+  // jurnaldan: har bir (qadam, kanal) holati
+  const ev = parseLog(job?.log)
+  const stateOf = (u, c) => {
+    const k = u.join('+')
+    const hit = ev.filter((e) => e.k === k && (e.c === c || e.c === '*')).pop()
+    if (hit?.m === '✓') return { s: 'ok' }
+    if (hit?.m === '✗') return { s: 'bad', e: hit.e }
+    return { s: ev.some((e) => e.m === '…' && e.k === k) ? 'run' : 'wait' }
+  }
+  const total = plan ? plan.units.length * plan.chats.length : 0
+  const cells = plan ? plan.units.flatMap((u) => plan.chats.map((c) => ({ u, c, ...stateOf(u, c) }))) : []
+  const nOk = cells.filter((x) => x.s === 'ok').length
+  const nBad = cells.filter((x) => x.s === 'bad').length
+  const fin = job && job.status !== 'running'
+  const curUnit = plan?.units.find((u) => plan.chats.some((c) => stateOf(u, c).s === 'run' || stateOf(u, c).s === 'wait'))
+  const retry = () => {
+    const bad = cells.filter((x) => x.s === 'bad')
+    const fl = [...new Set(bad.flatMap((x) => x.u))]
+    const ids = (chats || []).filter((c) => bad.some((x) => x.c === c.title)).map((c) => c.id)
+    if (fl.length && ids.length) start(fl, ids)
+  }
+  const pct = job ? Math.min(100, Math.max(job.progress, 0)) : 0
   return (
-    <Modal wide icon={Send} title={`Telegramga yuborish — ${dmy(b.date)}`} onClose={busy ? () => {} : onClose}
-      footer={<><div className="foot-info">{files.size} ta fayl{sel?.size ? ` → ${sel.size} ta kanal` : ''}</div>
-        <button className="btn ghost" onClick={onClose} disabled={busy}>Yopish</button>
-        <button className="btn primary" disabled={busy || !files.size || !sel?.size} onClick={go}><Send size={16} />Yuborish</button></>}>
-      <div className="send-grid">
-        <div>
-          <div className="mp-sec dark">1. Qaysi fayllar</div>
-          <div className="opts">{outs.map((o) => (
-            <label key={o.k} className={`opt ${files.has(o.k) ? 'on' : ''}`}><input type="checkbox" checked={files.has(o.k)} onChange={() => flip(setFiles, o.k)} disabled={busy} />
-              <i>{o.ext === 'png' ? <ImageIcon size={20} /> : <FileSpreadsheet size={20} />}</i>
-              <span><b>{o.title}</b><small>{o.ext === 'png' ? 'Rasm (jadval)' : `Excel fayl${o.rows != null ? ` · ${num(o.rows)} qator` : ''}${o.default ? '' : ' · qo\'shimcha'}`}</small></span></label>))}</div>
-          <small className="hint">Ikkala rasm tanlansa — bitta albom (karusel) bo'lib ketadi, keyin Excel fayllar. Izohsiz yuboriladi.</small>
+    <Modal wide icon={Send} title={`Telegramga yuborish — ${dmy(b.date)}`} onClose={onClose}
+      footer={<><div className="foot-info">{plan ? (fin ? `${nOk} ta yuborildi${nBad ? `, ${nBad} ta xato` : ''}` : `Yuborilmoqda: ${nOk + nBad} / ${total}`) : `${files.size} ta fayl${sel?.size ? ` → ${sel.size} ta kanal` : ''}`}</div>
+        <button className="btn ghost" onClick={onClose}>{busy ? 'Yopish (fonda davom etadi)' : 'Yopish'}</button>
+        {plan && fin && <button className="btn ghost" onClick={() => { setPlan(null); setJob(null) }}><RefreshCw size={16} />Yangi yuborish</button>}
+        {plan && fin && nBad > 0 && <button className="btn primary" onClick={retry}><RefreshCw size={16} />Xatolarni qayta yuborish</button>}
+        {!plan && <button className="btn primary" disabled={busy || !files.size || !sel?.size} onClick={() => start(outs.map((o) => o.k).filter((k) => files.has(k)), [...sel])}><Send size={16} />Yuborish</button>}</>}>
+      {plan ? (
+        <div className="sp-wrap">
+          <div className={`sp-head ${fin ? (nBad ? 'bad' : 'ok') : ''}`}>
+            <div className="sp-pct">{fin && !nBad ? <CheckCircle2 size={30} /> : fin ? <AlertTriangle size={30} /> : <Loader2 size={30} className="spin" />}<b>{Math.round(fin && job.status === 'done' ? 100 : pct)}%</b></div>
+            <div className="sp-info">
+              <b>{fin ? (nBad ? 'Yuborish yakunlandi — xatolar bor' : 'Hammasi yuborildi') : curUnit ? `Hozir: ${unitTitle(curUnit)}` : 'Boshlanmoqda…'}</b>
+              <small>{nOk} / {total} qadam bajarildi{nBad ? ` · ${nBad} ta xato` : ''} · {plan.chats.length} ta kanal · {mmss(Math.max(now - t0, 0))}</small>
+            </div>
+          </div>
+          <div className="progress"><div className="bar" style={{ width: `${fin && job.status === 'done' ? 100 : pct}%` }} /><span>{Math.round(pct)}%</span></div>
+          <div className="sp-list">{plan.units.map((u) => {
+            const st = plan.chats.map((c) => ({ c, ...stateOf(u, c) }))
+            const all = st.every((x) => x.s === 'ok'), any = st.some((x) => x.s === 'bad'), run = st.some((x) => x.s === 'run')
+            const cls = any ? 'bad' : all ? 'ok' : run ? 'run' : 'wait'
+            return (
+              <div key={u.join('+')} className={`sp-row ${cls}`}>
+                <i>{cls === 'ok' ? <CheckCircle2 size={18} /> : cls === 'bad' ? <AlertTriangle size={18} /> : cls === 'run' ? <Loader2 size={18} className="spin" /> : <Clock size={18} />}</i>
+                <span><b>{unitTitle(u)}</b>
+                  <small>{st.map((x) => <em key={x.c} className={`sp-chip ${x.s}`}>{x.s === 'ok' ? '✓' : x.s === 'bad' ? '✗' : x.s === 'run' ? '…' : '·'} {x.c}{x.e ? ` — ${x.e}` : ''}</em>)}</small></span>
+              </div>)
+          })}</div>
+          {job?.status === 'error' && !nBad && <div className="alert"><AlertTriangle size={16} />Yuborishda kutilmagan xato bo'ldi. Qayta urinib ko'ring.</div>}
+          <small className="hint">Yopib qo'ysangiz ham yuborish serverda davom etadi. Natijani «Xabar yuborish → Jurnal» dan ko'rishingiz mumkin.</small>
         </div>
-        <div>
-          <div className="mp-sec dark">2. Qaysi kanal yoki guruhga</div>
-          {!chats ? <Spinner /> : chats.length === 0 ? (
-            <div className="empty sm"><Megaphone size={30} /><div>Hali kanal yoki guruh qo'shilmagan. <Link to="/sozlamalar" onClick={onClose}>Sozlamalar</Link> bo'limidan qo'shing.</div></div>
-          ) : <ChatTable chats={chats} sel={sel} busy={busy} onToggle={(id) => flip(setSel, id)} onAll={(v) => setSel(v ? new Set(chats.map((c) => c.id)) : new Set())} />}
+      ) : (<>
+        <div className="send-grid">
+          <div>
+            <div className="mp-sec dark">1. Qaysi fayllar</div>
+            <div className="opts">{outs.map((o) => (
+              <label key={o.k} className={`opt ${files.has(o.k) ? 'on' : ''}`}><input type="checkbox" checked={files.has(o.k)} onChange={() => flip(setFiles, o.k)} />
+                <i>{o.ext === 'png' ? <ImageIcon size={20} /> : <FileSpreadsheet size={20} />}</i>
+                <span><b>{o.title}</b><small>{o.ext === 'png' ? 'Rasm (jadval)' : `Excel fayl${o.rows != null ? ` · ${num(o.rows)} qator` : ''}${o.default ? '' : ' · qo\'shimcha'}`}</small></span></label>))}</div>
+            <small className="hint">Ikkala rasm tanlansa — bitta albom (karusel) bo'lib ketadi, keyin Excel fayllar. Izohsiz yuboriladi.</small>
+          </div>
+          <div>
+            <div className="mp-sec dark">2. Qaysi kanal yoki guruhga</div>
+            {!chats ? <Spinner /> : chats.length === 0 ? (
+              <div className="empty sm"><Megaphone size={30} /><div>Hali kanal yoki guruh qo'shilmagan. <Link to="/sozlamalar" onClick={onClose}>Sozlamalar</Link> bo'limidan qo'shing.</div></div>
+            ) : <ChatTable chats={chats} sel={sel} busy={busy} onToggle={(id) => flip(setSel, id)} onAll={(v) => setSel(v ? new Set(chats.map((c) => c.id)) : new Set())} />}
+          </div>
         </div>
-      </div>
-      <label className={`ack-opt ${ack ? 'on' : ''}`}><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} disabled={busy} />
-        <i><MailCheck size={18} /></i><span><b>«Tanishdim» tugmasi</b><small>Oxirgi fayl tagida tugma chiqadi; kim bosgani «Xabar yuborish → Jurnal» da ko'rinadi</small></span></label>
-      {job && (<div className="send-prog"><div className="progress"><div className="bar" style={{ width: `${job.progress}%` }} /><span>{Math.round(job.progress)}%</span></div>
-        <div className="send-log">{job.log.split('\n').filter(Boolean).map((l, i) => (
-          <div key={i} className={l.startsWith('✗') ? 'bad' : 'ok'}>{l.startsWith('✗') ? <AlertTriangle size={14} /> : l.startsWith('…') ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={14} />}<span>{l.slice(2)}</span></div>))}</div></div>)}
+        <label className={`ack-opt ${ack ? 'on' : ''}`}><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+          <i><MailCheck size={18} /></i><span><b>«Tanishdim» tugmasi</b><small>Oxirgi fayl tagida tugma chiqadi; kim bosgani «Xabar yuborish → Jurnal» da ko'rinadi</small></span></label>
+      </>)}
     </Modal>
   )
 }
@@ -130,7 +196,7 @@ function Batch({ id, onChanged, onDeleted, defaults }) {
         <h3><ClipboardList size={20} />{dmy(b.date)} <small className="mut">· {b.by}, {dt(b.at)}</small></h3>
         <div className="row-btns">
           {b.status === 'done' && can('daily.send') && can('telegram.send') && <button className="btn primary" onClick={() => setSend(true)}><Send size={16} />Telegramga yuborish</button>}
-          {can('daily.upload') && !live && <button className="btn ghost" disabled={!!busy} onClick={() => run('re', () => api.post(`/daily/${id}/recompute`), 'Qayta hisoblash boshlandi')} title="Sozlamalar o'zgargan bo'lsa"><RefreshCw size={16} />Qayta hisoblash</button>}
+          {(can('daily.recompute') || can('daily.upload')) && !live && <button className="btn ghost" disabled={!!busy} onClick={() => run('re', () => api.post(`/daily/${id}/recompute`), 'Qayta hisoblash boshlandi')} title="Sozlamalar o'zgargan bo'lsa"><RefreshCw size={16} />Qayta hisoblash</button>}
           {can('daily.delete') && <button className="btn ghost danger" onClick={() => setDel(true)}><Trash2 size={16} />O'chirish</button>}
         </div>
       </div>
@@ -148,15 +214,15 @@ function Batch({ id, onChanged, onDeleted, defaults }) {
           {b.ask.map((a) => (
             <label key={a.value} className="ask-row"><span><b>{a.value}</b><small className="mut"> · {num(a.count)} ta hisoblagich</small></span>
               <select value={map[a.value] || ''} onChange={(e) => setMap({ ...map, [a.value]: e.target.value })}><option value="">— tanlang —</option>{CATS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>))}
-          {can('daily.upload')
+          {(can('daily.recompute') || can('daily.upload'))
             ? <button className="btn primary" disabled={!!busy || b.ask.some((a) => !map[a.value])} onClick={() => run('types', () => api.post(`/daily/${id}/types`, { map }), 'Saqlandi, hisoblanmoqda')}><Save size={16} />Saqlash va davom etish</button>
             : <div className="mut">Buni «5 ta Excel faylni yuklash» ruxsati bor xodim belgilaydi.</div>}
         </div>)}
       {b.status === 'done' && (<>
-        <div className="row-btns daily-dl">
+        {can('daily.download') && <div className="row-btns daily-dl">
           {(b.outs || []).map((o) => <button key={o.k} className="btn ghost" disabled={!!busy} onClick={() => dl(o.k, `${o.title}.${o.ext}`)} title={o.default ? '' : 'Qo\'shimcha (Telegramga standart yuborilmaydi)'}>{o.ext === 'png' ? <ImageIcon size={16} /> : <FileSpreadsheet size={16} />}{o.title}{o.rows != null ? ` · ${num(o.rows)}` : ''}</button>)}
           <button className="btn ghost" disabled={!!busy} onClick={() => zip('out')}><Package size={16} />Hammasi (ZIP)</button>
-        </div>
+        </div>}
         {b.tables.map((tb) => <DailyTable key={tb.key} tb={tb} region={b.region} date={b.date} />)}
       </>)}
       {send && <SendModal b={b} defaults={defaults} onClose={() => setSend(false)} />}
@@ -264,7 +330,7 @@ function SettingsTab({ onSaved }) {
     setBusy(true)
     try {
       const body = { region: f.region, t1_title: f.t1_title, t2_title: f.t2_title, task_title: f.task_title, offline_days: Number(f.offline_days), time_edges: edges,
-        esp_order: esps, types: f.types, fn_t1: f.fn_t1, fn_t2: f.fn_t2, fn_task: f.fn_task, chats: f.chats }
+        esp_order: esps, types: f.types, fn_t1: f.fn_t1, fn_t2: f.fn_t2, fn_task: f.fn_task, chats: f.chats, titles: f.titles || {} }
       const r = await api.put('/daily/settings', body)
       toast('Saqlandi. Mavjud kunlar uchun «Qayta hisoblash» ni bosing'); onSaved?.(r); await load()
     } catch (e) { toast(e.message, 'err') } finally { setBusy(false) }
@@ -282,6 +348,12 @@ function SettingsTab({ onSaved }) {
             <label className="field"><span>Fayl nomi shabloni</span><input value={f[`fn_${k}`]} onChange={(e) => set(`fn_${k}`, e.target.value)} />
               <small className="hint">Namuna: <b>{s.examples[k]}</b></small></label>
           </div>))}
+        <h4 className="set-sub">Yuboriladigan 7 ta nomma-nom fayl nomlari</h4>
+        {s.list_titles.map((x) => (
+          <label key={x.k} className="field"><span>{x.default}</span>
+            <input value={(f.titles || {})[x.k] ?? ''} placeholder={x.default} onChange={(e) => set('titles', { ...(f.titles || {}), [x.k]: e.target.value })} />
+            <small className="hint">Namuna: <b>{s.examples[x.k]}</b></small></label>))}
+        <small className="hint">Bo'sh qoldirsangiz — standart nom ishlatiladi. Fayl nomi yuqoridagi «Nomma-nom topshiriq fayli» shabloni bo'yicha tuziladi ({'{nom}'} o'rniga shu nom qo'yiladi). Ikkala jadval rasmi nomi — birinchi va ikkinchi jadval nomidan olinadi.</small>
         <small className="hint">Shablon o'rin belgilari: {Object.entries(s.placeholders).map(([k, v]) => <span key={k} className="fn-ph"><code>{`{${k}}`}</code> {v}</span>)}. Fayl nomidagi o'zgarish keyingi yuklab olish/yuborishdan kuchga kiradi.</small>
       </section>
       <section className="card pad set-card">

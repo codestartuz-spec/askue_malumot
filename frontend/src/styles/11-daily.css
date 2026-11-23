@@ -42,3 +42,22 @@
 .chat-pick{display:grid;gap:12px;margin-top:10px}
 .chat-pick .chk{display:flex;gap:8px;align-items:center;font-weight:500;padding:2px 0}
 @media (max-width:700px){.daily-set{grid-template-columns:1fr}.daily-files{grid-template-columns:1fr}}
+.daily-set .set-sub{margin:14px 0 4px;font-size:14px;color:var(--navy,#0b2a5b)}
+/* Telegramga yuborish: jonli progress */
+.sp-wrap{display:flex;flex-direction:column;gap:12px}
+.sp-head{display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:14px;background:#eaf1ff;border:1px solid #c9d9fb}
+.sp-head.ok{background:#e9f8ef;border-color:#b9e4c8}
+.sp-head.bad{background:#fff1ef;border-color:#f4c6c0}
+.sp-pct{display:flex;align-items:center;gap:8px;color:#1a4fc4}
+.sp-head.ok .sp-pct{color:#14804a}.sp-head.bad .sp-pct{color:#c0392b}
+.sp-pct b{font-size:28px;min-width:64px}
+.sp-info{display:flex;flex-direction:column;gap:2px}
+.sp-info small{color:#5b6b86}
+.sp-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto}
+.sp-row{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid #d7e0f0;border-radius:12px;background:#fff}
+.sp-row i{display:flex;margin-top:2px;color:#8a97ad}
+.sp-row.run{border-color:#8fb0f5;background:#f3f7ff}.sp-row.run i{color:#1a4fc4}
+.sp-row.ok{border-color:#b9e4c8;background:#f4fbf7}.sp-row.ok i{color:#14804a}
+.sp-row.bad{border-color:#f4c6c0;background:#fff6f5}.sp-row.bad i{color:#c0392b}
+.sp-row small{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:3px}
+.sp-chip{font-style:normal;color:#5b6b86}.sp-chip.ok{color:#14804a}.sp-chip.bad{color:#c0392b}.sp-chip.run{color:#1a4fc4}

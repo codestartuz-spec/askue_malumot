@@ -27,15 +27,19 @@ PERMS = [
      "Yuklash tarixidagi yozuvni, fayllarni va shu sana dinamikasini (Kunlik / Respublika / AG) o'chiradi", None),
 
     ("daily.view", "Kunlik topshiriq", "Kunlik topshiriq bo'limini ko'rish",
-     "Tayyor jadvallar, arxiv va tayyor Excel fayllarni yuklab olish", None),
-    ("daily.upload", "Kunlik topshiriq", "5 ta Excel faylni yuklash va qayta hisoblash",
-     "Fayllarni yuklaydi, jadval va topshiriq fayllarini tayyorlaydi", "daily.view"),
+     "Bo'lim, arxiv va tayyor jadvallarni ko'radi (fayl yuklab olish va yuborish alohida ruxsat)", None),
+    ("daily.upload", "Kunlik topshiriq", "5 ta Excel faylni yuklash",
+     "Har kungi 5 ta faylni yuklaydi (sanani tanlaydi); iste'molchi turini belgilashi mumkin", "daily.view"),
+    ("daily.recompute", "Kunlik topshiriq", "Qayta hisoblash",
+     "Sozlamalar o'zgargach kunni asl fayllardan qayta hisoblaydi; iste'molchi turini belgilaydi", "daily.view"),
+    ("daily.download", "Kunlik topshiriq", "Tayyor fayl va rasmlarni yuklab olish",
+     "2 ta jadval rasmi, 7 ta nomma-nom Excel va ZIP'ni yuklab oladi", "daily.view"),
     ("daily.original", "Kunlik topshiriq", "Yuklangan asl fayllarni yuklab olish",
      "Serverda saqlangan 5 ta asl Excel faylni yuklab oladi", "daily.view"),
     ("daily.send", "Kunlik topshiriq", "Kunlik topshiriq fayllarini Telegramga yuborish",
-     "Jadval va topshiriq fayllarini kanal/guruhlarga yuboradi", "daily.view"),
+     "Tanlangan jadval rasmlari va Excel fayllarni kanal/guruhlarga yuboradi (Telegram yuborish ruxsati ham kerak)", "daily.view"),
     ("daily.settings", "Kunlik topshiriq", "Kunlik topshiriq sozlamalari",
-     "Jadval nomlari, offline kunlari, kun oraliqlari, fayl nomlari, tartib va standart kanallar", "daily.view"),
+     "Jadval va fayl nomlari, offline kunlari, kun oraliqlari, rayonlar tartibi, standart kanallar", "daily.view"),
     ("daily.delete", "Kunlik topshiriq", "Arxivdan o'chirish", "Kun yozuvi va uning fayllarini o'chiradi", "daily.view"),
 
     ("drill.view", "Ro'yxat va hisobotlar", "Raqam ustiga bosib nomma-nom ro'yxatni ko'rish",
@@ -88,7 +92,10 @@ PRESETS = [
      "codes": _TBL + ["republic.view", "data.upload", "republic.upload", "data.delete", "republic.original",
                       "ag.view", "ag.upload", "ag.original"]},
     {"name": "Kunlik topshiriq", "hint": "Fayl yuklaydi, jadval tayyorlaydi va Telegramga yuboradi",
-     "codes": ["daily.view", "daily.upload", "daily.original", "daily.send"]},
+     "codes": ["daily.view", "daily.upload", "daily.recompute", "daily.download", "daily.original", "daily.send",
+               "telegram.send"]},
+    {"name": "Kunlik topshiriq (ko'ruvchi)", "hint": "Tayyor jadval va fayllarni ko'radi, yuklab oladi",
+     "codes": ["daily.view", "daily.download"]},
     {"name": "Telegram operatori", "hint": "Hisobot va xabar yuboradi",
      "codes": _TBL + ["republic.view", "ag.view", "report.download", "telegram.send", "telegram.message",
                       "telegram.journal"]},
@@ -110,7 +117,8 @@ def validate_catalog() -> list[str]:
 # Eski ruxsatlar bo'yicha yangi ruxsatlarni avtomatik berish (bir marta): (eski, [yangilari])
 INHERIT = {"data.upload": ["republic.upload", "data.delete"],
            "telegram.send": ["telegram.message", "telegram.journal"],
-           "republic.view": ["republic.original"]}
+           "republic.view": ["republic.original"],
+           "daily.view": ["daily.download"], "daily.upload": ["daily.recompute"]}
 
 # Guruh bo'yicha (bir marta): yangi bo'lim ruxsatlarini mavjud bo'lim ruxsati bor xodimlarga berish
 INHERIT_GROUPS = {"grp:ag": {"republic.view": ["ag.view"], "republic.upload": ["ag.upload"],

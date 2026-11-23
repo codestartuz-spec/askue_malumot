@@ -91,7 +91,7 @@ def _clean_settings(client):
 
 @pytest.fixture
 def ops(make_user):
-    return make_user(["daily.view", "daily.upload", "daily.original", "daily.send", "daily.settings", "daily.delete",
+    return make_user(["daily.view", "daily.upload", "daily.recompute", "daily.download", "daily.original", "daily.send", "daily.settings", "daily.delete",
                       "telegram.send"])[1]
 
 
@@ -228,7 +228,20 @@ def test_upload_validation_and_permissions(client, ops, make_user):
     _, noorig = make_user(["daily.view"])
     d = _wait(client, ops, _post(client, ops, f, day="2026-11-22").json()["id"])
     assert client.get(f"/api/daily/{d['id']}/file/area", headers=noorig).status_code == 403   # asl faylga ruxsat yo'q
-    assert client.get(f"/api/daily/{d['id']}/file/t1", headers=noorig).status_code == 200
+    assert client.get(f"/api/daily/{d['id']}/file/t1", headers=noorig).status_code == 403    # yuklab olish alohida ruxsat
+    assert client.get(f"/api/daily/{d['id']}/zip/out", headers=noorig).status_code == 403
+    assert client.get(f"/api/daily/{d['id']}", headers=noorig).status_code == 200            # ko'rish mumkin
+    _, dl = make_user(["daily.view", "daily.download"])
+    assert client.get(f"/api/daily/{d['id']}/file/img1", headers=dl).status_code == 200
+    assert client.get(f"/api/daily/{d['id']}/zip/out", headers=dl).status_code == 200
+    assert client.get(f"/api/daily/{d['id']}/file/area", headers=dl).status_code == 403      # asl fayl — yana boshqa ruxsat
+    assert client.post(f"/api/daily/{d['id']}/recompute", headers=dl).status_code == 403
+    _, rc = make_user(["daily.view", "daily.recompute"])
+    assert client.post(f"/api/daily/{d['id']}/recompute", headers=rc).status_code == 200
+    assert client.post(f"/api/daily/{d['id']}/send", json={"files": ["img1"], "chat_ids": [1]}, headers=rc).status_code == 403
+    assert client.put("/api/daily/settings", json={}, headers=rc).status_code in (403, 422) and \
+        client.get("/api/daily/chats", headers=rc).status_code == 403
+    _wait(client, ops, d["id"])
     assert client.delete(f"/api/daily/{d['id']}", headers=noorig).status_code == 403
     client.delete(f"/api/daily/{d['id']}", headers=ops)
 
@@ -259,6 +272,11 @@ def test_settings_change_offline_days_and_names(client, ops):
            ("fn_t1", ""), ("t1_title", " ")]
     for k, v in bad:
         assert client.put("/api/daily/settings", json={**body, k: v}, headers=ops).status_code == 400, k
+    s2 = client.put("/api/daily/settings", json={**body, "titles": {"low": "Past obxod", "bad": "x", "off": "  "}}, headers=ops)
+    assert s2.status_code == 200 and s2.json()["titles"] == {"low": "Past obxod"}          # noma'lum va bo'sh nomlar tashlanadi
+    assert s2.json()["examples"]["low"] == "Past_obxod_23.11.2026.xlsx"
+    assert [x["k"] for x in s2.json()["list_titles"]][:3] == ["off", "low", "prim"] and len(s2.json()["list_titles"]) == 7
+    client.put("/api/daily/settings", json={**body, "titles": {}}, headers=ops)
     ok = {**body, "offline_days": 1, "fn_task": "Topshiriq_{sana}", "t1_title": "Kontsentratorlar holati"}
     r = client.put("/api/daily/settings", json=ok, headers=ops)
     assert r.status_code == 200 and r.json()["examples"]["task"] == "Topshiriq_2026-11-23.xlsx"
@@ -292,6 +310,9 @@ def test_send_files_to_selected_chats(client, ops, fake_tg):
             break
         time.sleep(0.2)
     assert st["status"] == "done", st
+    log = [l.split("\t") for l in st["log"].split("\n")]       # jonli progress oynasi shu formatni o'qiydi
+    assert log[0][0] == "…" and ["✓", "img1+img2", "Kunlik guruh"] in log and ["✓", "nm3", "Kunlik guruh"] in log
+    assert st["progress"] == 100
     sent = [s[1] for s in fake_tg if s[0] == "-100555"]            # tartib: avval 2 rasm, keyin 7 fayl
     assert sent == ["ALBUM:Konsentratorlar_18.11.2026.png+Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.png",
                     "Offline_konsentratorlar_(3_kundan_ortiq)_18.11.2026.xlsx",
