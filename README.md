@@ -171,3 +171,13 @@ login/IP/qurilma, PDF, shifrlash, Redis/navbat, migratsiya, audit va yuborish ja
 - Offline: faqat Online_Device faylidan; oxirgi N kun (sukut 3: 21, 22, 23.11) «shundan N kundan ortiq» ga kirmaydi. Kun oraliqlari (2/7/30/90), jadval nomlari, fayl nomi shablonlari, rayonlar tartibi, standart kanallar — bo'lim Sozlamalarida.
 - Iste'molchi turi tushunarsiz bo'lsa, yuklashda bir marta so'raladi va saqlanadi.
 - Telegram: umumiy bot va kanallar; faqat fayl yuboriladi. Jadvallar: `daily_batches`, `daily_settings` (Alembic 0003).
+
+## v13 — Kunlik topshiriq: 2 rasm + 7 alohida fayl, katak bo'yicha o'qish
+- **Fayl turi va ustunlar sarlavha nomiga qaramaydi**: tur ma'lumot qatorining ko'rinishidan, ustunlar katak o'rnidan aniqlanadi
+  (`services/daily.py`: `POS`, `_is_data`). Sarlavha nomi yoki tili o'zgarsa ham ishlaydi; fayl nomi faqat tenglikda yordam beradi.
+- **Telegramga yuboriladi (shu tartibda)**: 1) Konsentratorlar jadvali — rasm; 2) Aloqadan chiqib ketgan hisoblagichlar jadvali — rasm;
+  3) Offline konsentratorlar (N kundan ortiq); 4) Obxod olish darajasi past (0–50%) konsentratorlar; 5) To'g'ridan to'g'ri ulanish (Primichka);
+  6–9) Aloqadan chiqib ketgan hisoblagichlar 2-7 / 7-30 / 30-90 kun / 90 kundan ortiq — hammasi nomma-nom (xodim bilan), alohida Excel.
+- Eski jadval Excel fayllari (t1, t2) va 3 varaqli umumiy fayl yuklab olish uchun qoldirilgan (Telegramga standart yuborilmaydi).
+- Rasm Pillow bilan chiziladi (shrift: `assets/fonts/Carlito`), Telegramga `sendPhoto` orqali, izohsiz.
+- Yuborish oynasi darhol «Yuborish boshlandi» va har fayl uchun «yuborilmoqda» qatorini ko'rsatadi.

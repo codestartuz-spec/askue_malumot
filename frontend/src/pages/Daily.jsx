@@ -2,7 +2,7 @@
 // Tablar: Fayl yuklash · Arxiv · Sozlamalar (boshqa bo'limlardan mustaqil).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Archive, ArrowDown, ArrowUp, CheckCircle2, ClipboardList, Download, Eye, FileArchive, FileSpreadsheet, Loader2, Megaphone, Package, RefreshCw, Save, Send, Settings2, Trash2, UploadCloud, X, AlertTriangle, MailCheck } from 'lucide-react'
+import { Archive, ArrowDown, ArrowUp, CheckCircle2, ClipboardList, Download, Eye, FileArchive, FileSpreadsheet, Image as ImageIcon, Loader2, Megaphone, Package, RefreshCw, Save, Send, Settings2, Trash2, UploadCloud, X, AlertTriangle, MailCheck } from 'lucide-react'
 import { api, download, uploadForm } from '../api'
 import { useAuth } from '../auth'
 import { ChatTable, Confirm, Empty, Modal, Spinner, useToast } from '../ui'
@@ -19,7 +19,7 @@ const kindOf = (name = '') => {
   const n = name.toLowerCase().replace(/[^a-z0-9_]/g, '')
   return KINDS.find((x) => n.includes(x.hint))?.k || ''
 }
-const OUT = [{ k: 't1', t: 't1_title' }, { k: 't2', t: 't2_title' }, { k: 'task', t: 'task_title' }]
+const GROUPS = [{ k: 't1', t: 't1_title', note: 'Konsentratorlar jadvali (rasm)' }, { k: 't2', t: 't2_title', note: 'Aloqadan chiqib ketgan hisoblagichlar jadvali (rasm)' }, { k: 'task', t: 'task_title', note: '7 ta nomma-nom Excel fayl' }]
 const CATS = [['aholi', 'Aholi'], ['ulgurji', 'Ulgurji'], ['balans', 'Balans']]
 const mb = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
 
@@ -46,17 +46,18 @@ function DailyTable({ tb, region, date }) {
 }
 
 /* ------------------------------------------------------------------ Telegramga yuborish */
-function SendModal({ b, titles, defaults, onClose }) {
+function SendModal({ b, defaults, onClose }) {
   const toast = useToast()
   const [chats, setChats] = useState(null)
-  const [files, setFiles] = useState(new Set(OUT.map((o) => o.k)))
+  const outs = b.outs || []
+  const [files, setFiles] = useState(new Set(outs.filter((o) => o.default).map((o) => o.k)))
   const [sel, setSel] = useState(null)
   const [ack, setAck] = useState(false)
   const [job, setJob] = useState(null)
   const [busy, setBusy] = useState(false)
   const timer = useRef(null)
   useEffect(() => {
-    api.get('/daily/chats').then((c) => { setChats(c); setSel(new Set(c.filter((x) => OUT.some((o) => (defaults[o.k] || []).includes(x.id))).map((x) => x.id))) })
+    api.get('/daily/chats').then((c) => { setChats(c); setSel(new Set(c.filter((x) => GROUPS.some((g) => (defaults[g.k] || []).includes(x.id))).map((x) => x.id))) })
       .catch((e) => { toast(e.message, 'err'); setChats([]); setSel(new Set()) })
     return () => clearInterval(timer.current)
   }, [])
@@ -64,7 +65,7 @@ function SendModal({ b, titles, defaults, onClose }) {
   const go = async () => {
     setBusy(true)
     try {
-      const r = await api.post(`/daily/${b.id}/send`, { files: OUT.map((o) => o.k).filter((k) => files.has(k)), chat_ids: [...sel], ack })
+      const r = await api.post(`/daily/${b.id}/send`, { files: outs.map((o) => o.k).filter((k) => files.has(k)), chat_ids: [...sel], ack })
       setJob({ status: 'running', progress: 0, log: '' })
       timer.current = setInterval(async () => {
         try {
@@ -83,9 +84,11 @@ function SendModal({ b, titles, defaults, onClose }) {
       <div className="send-grid">
         <div>
           <div className="mp-sec dark">1. Qaysi fayllar</div>
-          <div className="opts">{OUT.map((o) => (
+          <div className="opts">{outs.map((o) => (
             <label key={o.k} className={`opt ${files.has(o.k) ? 'on' : ''}`}><input type="checkbox" checked={files.has(o.k)} onChange={() => flip(setFiles, o.k)} disabled={busy} />
-              <i><FileSpreadsheet size={20} /></i><span><b>{titles[o.t]}</b><small>Excel fayl</small></span></label>))}</div>
+              <i>{o.ext === 'png' ? <ImageIcon size={20} /> : <FileSpreadsheet size={20} />}</i>
+              <span><b>{o.title}</b><small>{o.ext === 'png' ? 'Rasm (jadval)' : `Excel fayl${o.rows != null ? ` · ${num(o.rows)} qator` : ''}${o.default ? '' : ' · qo\'shimcha'}`}</small></span></label>))}</div>
+          <small className="hint">Tartib: avval 2 ta jadval rasmi, keyin Excel fayllar. Faqat fayl yuboriladi (izohsiz).</small>
         </div>
         <div>
           <div className="mp-sec dark">2. Qaysi kanal yoki guruhga</div>
@@ -98,13 +101,13 @@ function SendModal({ b, titles, defaults, onClose }) {
         <i><MailCheck size={18} /></i><span><b>«Tanishdim» tugmasi</b><small>Oxirgi fayl tagida tugma chiqadi; kim bosgani «Xabar yuborish → Jurnal» da ko'rinadi</small></span></label>
       {job && (<div className="send-prog"><div className="progress"><div className="bar" style={{ width: `${job.progress}%` }} /><span>{Math.round(job.progress)}%</span></div>
         <div className="send-log">{job.log.split('\n').filter(Boolean).map((l, i) => (
-          <div key={i} className={l.startsWith('✗') ? 'bad' : 'ok'}>{l.startsWith('✗') ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}<span>{l.slice(2)}</span></div>))}</div></div>)}
+          <div key={i} className={l.startsWith('✗') ? 'bad' : 'ok'}>{l.startsWith('✗') ? <AlertTriangle size={14} /> : l.startsWith('…') ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={14} />}<span>{l.slice(2)}</span></div>))}</div></div>)}
     </Modal>
   )
 }
 
 /* ------------------------------------------------------------------ bitta kun: holat, jadvallar, amallar */
-function Batch({ id, onChanged, onDeleted, titles, defaults }) {
+function Batch({ id, onChanged, onDeleted, defaults }) {
   const { can } = useAuth()
   const toast = useToast()
   const [b, setB] = useState(null)
@@ -151,13 +154,12 @@ function Batch({ id, onChanged, onDeleted, titles, defaults }) {
         </div>)}
       {b.status === 'done' && (<>
         <div className="row-btns daily-dl">
-          {OUT.map((o) => <button key={o.k} className="btn ghost" disabled={!!busy} onClick={() => dl(o.k, `${titles[o.t]}.xlsx`)}><FileSpreadsheet size={16} />{titles[o.t]}</button>)}
+          {(b.outs || []).map((o) => <button key={o.k} className="btn ghost" disabled={!!busy} onClick={() => dl(o.k, `${o.title}.${o.ext}`)} title={o.default ? '' : 'Qo\'shimcha (Telegramga standart yuborilmaydi)'}>{o.ext === 'png' ? <ImageIcon size={16} /> : <FileSpreadsheet size={16} />}{o.title}{o.rows != null ? ` · ${num(o.rows)}` : ''}</button>)}
           <button className="btn ghost" disabled={!!busy} onClick={() => zip('out')}><Package size={16} />Hammasi (ZIP)</button>
         </div>
-        <div className="daily-counts mut">Topshiriq fayli: offline kontsentratorlar <b>{num(b.counts.offline)}</b> · aloqasiz hisoblagichlar <b>{num(b.counts.nometer)}</b> · primichka <b>{num(b.counts.direct)}</b></div>
         {b.tables.map((tb) => <DailyTable key={tb.key} tb={tb} region={b.region} date={b.date} />)}
       </>)}
-      {send && <SendModal b={b} titles={titles} defaults={defaults} onClose={() => setSend(false)} />}
+      {send && <SendModal b={b} defaults={defaults} onClose={() => setSend(false)} />}
       {del && <Confirm icon={Trash2} title="Kunni o'chirish" ok="Ha, o'chirish" danger onOk={() => run('del', async () => { await api.del(`/daily/${id}`); setDel(false); onDeleted?.() }, "O'chirildi")} onCancel={() => setDel(false)}>
         {dmy(b.date)} sanasidagi yuklangan fayllar, jadvallar va tayyor Excel fayllar serverdan o'chiriladi. <small className="hint">Buni qaytarib bo'lmaydi.</small></Confirm>}
     </div>
@@ -165,7 +167,7 @@ function Batch({ id, onChanged, onDeleted, titles, defaults }) {
 }
 
 /* ------------------------------------------------------------------ Fayl yuklash tabi */
-function UploadTab({ titles, defaults }) {
+function UploadTab({ defaults }) {
   const toast = useToast()
   const { can } = useAuth()
   const [files, setFiles] = useState([])
@@ -205,14 +207,14 @@ function UploadTab({ titles, defaults }) {
         <div className="daily-files">{KINDS.map((x) => { const f = by[x.k]; return (
           <div key={x.k} className={`dfile ${f ? 'ok' : ''}`}>{f ? <CheckCircle2 size={16} /> : <FileArchive size={16} />}<span><b>{x.label}</b><small>{f ? `${f.name} · ${mb(f.size)}` : 'tanlanmagan'}</small></span>
             {f && <button className="icon-btn" onClick={() => setFiles(files.filter((y) => y !== f))} title="Olib tashlash"><X size={15} /></button>}</div>) })}</div>
-        {files.some((f) => !kindOf(f.name)) && <small className="hint">Ba'zi fayl nomlari tanish emas — server fayl turini sarlavhasi bo'yicha o'zi aniqlaydi.</small>}
+        {files.some((f) => !kindOf(f.name)) && <small className="hint">Ba'zi fayl nomlari tanish emas — server fayl turini ustunlar tartibi va ma'lumot ko'rinishi bo'yicha o'zi aniqlaydi.</small>}
         <div className="daily-go">
           <label className="field"><span>Sana (bo'sh qoldirsangiz — bugungi kun)</span><input type="date" value={day} onChange={(e) => setDay(e.target.value)} /></label>
           <button className="btn primary" disabled={files.length !== 5 || pr !== null} onClick={go}>{pr !== null ? <Loader2 size={16} className="spin" /> : <UploadCloud size={16} />}Yuklash va jadvallarni tayyorlash{pr !== null ? ` · ${Math.round(pr * 100)}%` : ''}</button>
         </div>
         {files.length > 0 && !ok && files.length === 5 && <small className="hint">Bir xil turdagi ikkita fayl bor bo'lishi mumkin — server tekshiradi.</small>}
       </div>
-      {cur && <Batch id={cur} titles={titles} defaults={defaults} onDeleted={() => setCur(null)} />}
+      {cur && <Batch id={cur} defaults={defaults} onDeleted={() => setCur(null)} />}
     </div>
   )
 }
@@ -220,7 +222,7 @@ function UploadTab({ titles, defaults }) {
 /* ------------------------------------------------------------------ Arxiv tabi */
 const ST = { queued: ['Navbatda', 'amber'], running: ['Hisoblanmoqda', 'blue'], ask: ['Javob kutilmoqda', 'amber'], done: ['Tayyor', 'green'], error: ['Xatolik', 'red'] }
 
-function ArchiveTab({ titles, defaults }) {
+function ArchiveTab({ defaults }) {
   const [list, setList] = useState(null)
   const [open, setOpen] = useState(null)
   const toast = useToast()
@@ -239,7 +241,7 @@ function ArchiveTab({ titles, defaults }) {
               <td className="mut">{x.by}<div>{dt(x.at)}</div></td>
               <td className="acts"><button className="btn ghost sm" onClick={() => setOpen(x.id)}><Eye size={15} />Ochish</button></td></tr>) })}</tbody></table></div></div>)}
       {open && <Modal wide icon={Archive} title="Kunlik topshiriq" onClose={() => { setOpen(null); load() }}>
-        <Batch id={open} titles={titles} defaults={defaults} onChanged={() => {}} onDeleted={() => { setOpen(null); load() }} /></Modal>}
+        <Batch id={open} defaults={defaults} onChanged={() => {}} onDeleted={() => { setOpen(null); load() }} /></Modal>}
     </div>
   )
 }
@@ -304,10 +306,10 @@ function SettingsTab({ onSaved }) {
       </section>
       <section className="card pad set-card">
         <h3><Megaphone size={20} />Standart kanal va guruhlar</h3>
-        <small className="hint">Telegramga yuborishda har bir fayl uchun shu kanallar oldindan belgilanadi (yuborishda o'zgartirish mumkin). Bot va kanallar — umumiy: Sozlamalar → Telegram.</small>
+        <small className="hint">Telegramga yuborishda shu kanallar oldindan belgilanadi (yuborishda o'zgartirish mumkin). Bot va kanallar — umumiy: Sozlamalar → Telegram.</small>
         {chats.length === 0 ? <div className="mut" style={{ marginTop: 10 }}>Hali kanal yoki guruh qo'shilmagan.</div> : (
-          <div className="chat-pick">{OUT.map((o) => (
-            <div key={o.k}><b>{f[o.t]}</b>{chats.map((c) => <label key={c.id} className="chk"><input type="checkbox" checked={(f.chats[o.k] || []).includes(c.id)} onChange={() => chatSet(o.k, c.id)} />{c.title}</label>)}</div>))}</div>)}
+          <div className="chat-pick">{GROUPS.map((o) => (
+            <div key={o.k}><b>{o.note}</b>{chats.map((c) => <label key={c.id} className="chk"><input type="checkbox" checked={(f.chats[o.k] || []).includes(c.id)} onChange={() => chatSet(o.k, c.id)} />{c.title}</label>)}</div>))}</div>)}
       </section>
       <section className="card pad set-card">
         <h3><Archive size={20} />Iste'molchi turlari (saqlangan javoblar)</h3>
@@ -341,8 +343,8 @@ export default function Daily() {
     <div className="daily">
       <div className="tabs" role="tablist">{tabs.map((t) => (
         <button key={t.k} role="tab" aria-selected={t.k === tab} className={`tab ${t.k === tab ? 'on' : ''}`} onClick={() => setSp(t.k === 'yuklash' ? {} : { t: t.k }, { replace: true })}><t.icon size={18} /><span>{t.label}</span></button>))}</div>
-      {tab === 'yuklash' && <UploadTab titles={titles} defaults={defaults} />}
-      {tab === 'arxiv' && <ArchiveTab titles={titles} defaults={defaults} />}
+      {tab === 'yuklash' && <UploadTab defaults={defaults} />}
+      {tab === 'arxiv' && <ArchiveTab defaults={defaults} />}
       {tab === 'sozlamalar' && <SettingsTab onSaved={setCfg} />}
     </div>
   )

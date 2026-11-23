@@ -109,6 +109,17 @@ def send_file(chat_id: str, filename: str, data: bytes, markup: str | None = Non
     return call("sendDocument", params, files={"document": (filename, data)}, timeout=(15, 180))
 
 
+def send_photo(chat_id: str, filename: str, data: bytes, markup: str | None = None) -> dict:
+    """Rasm (izohsiz). Telegram rasm o'lchamini qabul qilmasa — fayl (document) sifatida yuboriladi."""
+    params = {"chat_id": chat_id}
+    if markup:
+        params["reply_markup"] = markup
+    try:
+        return call("sendPhoto", params, files={"photo": (filename, data, "image/png")}, timeout=(15, 180))
+    except TgError:
+        return send_file(chat_id, filename, data, markup)
+
+
 def _kind(mime: str) -> str:
     return "photo" if mime.startswith("image/") and mime != "image/gif" else "video" if mime.startswith("video/") else "document"
 

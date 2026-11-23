@@ -30,7 +30,8 @@ from .telegram import _chats
 
 router = APIRouter(prefix="/daily", tags=["daily"])
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-OUT = ("t1", "t2", "task")
+GROUPS = ("t1", "t2", "task")
+MIME = {"xlsx": XLSX, "png": "image/png"}
 LIMIT = D.MAX_XLSX_MB * 1048576
 
 
@@ -46,6 +47,9 @@ def _row(b: DailyBatch, full: bool = False) -> dict:
     if full:
         d["ask"] = b.ask or []
         d["tables"] = (b.data or {}).get("tables", [])
+        d["outs"] = [{"k": x["k"], "title": x["title"], "ext": x["ext"], "default": x["default"], "group": x["group"],
+                      "rows": (b.counts or {}).get(x["k"])} for x in D.out_specs(D.load_settings())
+                     if (_dir(b.task_date) / "out" / f"{x['k']}.{x['ext']}").exists()]
         d["region"] = (b.data or {}).get("region", "")
     return d
 
@@ -158,9 +162,15 @@ def process(bid: int) -> None:
         out.mkdir(parents=True)
         for tb in res["tables"]:
             (out / f"{tb['key']}.xlsx").write_bytes(D.table_xlsx(tb, s["region"], end))
-        _set(bid, progress=85, message="Topshiriq fayli tayyorlanmoqda…")
-        blob, counts = D.task_xlsx(end, data, s)
+        _set(bid, progress=78, message="Jadvallar rasmga olinmoqda…")
+        for i, tb in enumerate(res["tables"], 1):
+            (out / f"img{i}.png").write_bytes(D.table_png(tb, s["region"], end))
+        _set(bid, progress=85, message="Nomma-nom ro'yxatlar tayyorlanmoqda…")
+        blob, _legacy = D.task_xlsx(end, data, s)
         (out / "task.xlsx").write_bytes(blob)
+        files, counts = D.list_files(end, data, s)
+        for k, bl in files.items():
+            (out / f"{k}.xlsx").write_bytes(bl)
         _set(bid, status="done", progress=100, message="", files=meta, data=res, counts=counts,
              finished_at=datetime.now())
     except D.DailyError as e:
@@ -238,7 +248,7 @@ class SettingsIn(BaseModel):
 def put_settings(body: SettingsIn, user: User = Depends(need("daily.settings")), db: Session = Depends(get_db)):
     s = {**D.load_settings(), **body.model_dump()}
     s["esp_order"] = [e.strip() for e in s["esp_order"] if e.strip()]
-    s["chats"] = {k: list(dict.fromkeys(s["chats"].get(k, []))) for k in OUT}
+    s["chats"] = {k: list(dict.fromkeys(s["chats"].get(k, []))) for k in GROUPS}
     for k in ("region", "t1_title", "t2_title", "task_title", "fn_t1", "fn_t2", "fn_task"):
         s[k] = s[k].strip()
     err = D.validate_settings(s)
@@ -260,14 +270,15 @@ def detail(bid: int, _: User = Depends(need("daily.view")), db: Session = Depend
     return _row(_get(db, bid), True)
 
 
-def _out_file(b: DailyBatch, which: str) -> tuple[str, bytes]:
+def _out_file(b: DailyBatch, which: str) -> tuple[str, bytes, str]:
     s = D.load_settings()
-    if which in OUT:
-        f = _dir(b.task_date) / "out" / f"{which}.xlsx"
-        if b.status != "done" or not f.exists():
-            raise HTTPException(404, "Fayl hali tayyor emas")
-        return D.file_name(s, which, b.task_date), f.read_bytes()
-    raise HTTPException(404, "Noma'lum fayl")
+    sp = D.spec_of(s, which)
+    if not sp:
+        raise HTTPException(404, "Noma'lum fayl")
+    f = _dir(b.task_date) / "out" / f"{which}.{sp['ext']}"
+    if b.status != "done" or not f.exists():
+        raise HTTPException(404, "Fayl hali tayyor emas")
+    return D.file_name(s, which, b.task_date), f.read_bytes(), sp["ext"]
 
 
 def _attach(name: str, blob: bytes, mime: str = XLSX) -> Response:
@@ -284,7 +295,8 @@ def get_file(bid: int, which: str, user: User = Depends(need("daily.view")), db:
         if not f.exists():
             raise HTTPException(404, "Asl fayl serverda topilmadi")
         return _attach((b.files.get(which) or {}).get("name") or f"{D.LABEL[which]}.xlsx", f.read_bytes())
-    return _attach(*_out_file(b, which))
+    name, blob, ext = _out_file(b, which)
+    return _attach(name, blob, MIME[ext])
 
 
 @router.get("/{bid}/zip/{what}")
@@ -301,9 +313,10 @@ def get_zip(bid: int, what: str, user: User = Depends(need("daily.view")), db: S
                 if f.exists():
                     z.write(f, (b.files.get(k) or {}).get("name") or f"{D.LABEL[k]}.xlsx")
         elif what == "out":
-            for k in OUT:
-                n, blob = _out_file(b, k)
-                z.writestr(n, blob)
+            for sp in D.out_specs(D.load_settings()):
+                if (_dir(b.task_date) / "out" / f"{sp['k']}.{sp['ext']}").exists():
+                    n, blob, _e = _out_file(b, sp["k"])
+                    z.writestr(n, blob)
         else:
             raise HTTPException(404, "Noma'lum")
     return _attach(f"Kunlik_topshiriq_{b.task_date:%d.%m.%Y}_{what}.zip", buf.getvalue(), "application/zip")
@@ -333,8 +346,10 @@ def send(bid: int, body: SendIn, user: User = Depends(need("daily.send")), _p: U
     b = _get(db, bid)
     if b.status != "done":
         raise HTTPException(400, "Fayllar hali tayyor emas")
-    if not body.files or any(f not in OUT for f in body.files):
+    order = [x["k"] for x in D.out_specs(D.load_settings())]
+    if not body.files or any(f not in order for f in body.files):
         raise HTTPException(400, "Yuboriladigan faylni tanlang")
+    body.files = sorted(set(body.files), key=order.index)        # doim bir xil tartibda: rasmlar, keyin ro'yxatlar
     chats = sendjobs.chats_for(db, body.chat_ids)
     sendjobs.require_bot(db)
     job_id = sendjobs.create_job(db, user.username)
@@ -357,11 +372,13 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
     def flush(st="running"):
         sendjobs.flush(job_id, st, done, total, lines)
 
+    lines.append(f"… Yuborish boshlandi: {len(files)} ta fayl → {len(chats)} ta kanal")
+    flush()
     try:
         for which in files:
             try:
                 with SessionLocal() as db:
-                    name, blob = _out_file(_get(db, bid), which)
+                    name, blob, ext = _out_file(_get(db, bid), which)
             except HTTPException as e:
                 lines.append(f"✗ {which}: {e.detail}")
                 fails += len(chats)
@@ -371,10 +388,13 @@ def run_send(job_id: int, bid: int, files, chats, post_id: int = 0, pitems: dict
             if post_id:
                 P.add_file(post_id, name)
             is_last = which == files[-1]
+            lines.append(f"… {name} yuborilmoqda")
+            flush()
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
                 try:
-                    res = tg.send_file(chat_id, name, blob, P.markup(iid) if (ack and is_last and iid) else None)
+                    mk = P.markup(iid) if (ack and is_last and iid) else None
+                    res = tg.send_photo(chat_id, name, blob, mk) if ext == "png" else tg.send_file(chat_id, name, blob, mk)
                     last_mid[str(chat_id)] = res.get("message_id")
                     lines.append(f"✓ {name} → {title}")
                 except tg.TgError as e:

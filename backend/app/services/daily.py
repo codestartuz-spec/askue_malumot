@@ -5,11 +5,12 @@ Boshqa bo'limlardan to'liq ajratilgan: o'z jadvali (daily_batches), o'z papkasi 
 Fayllar:  area (AreaInformationReport) · status (CommissioningStatus) · direct (DirectMeter)
           nometer (NoMeterData) · online (Online_Device_Monitoring_Report — faqat offline qurilmalar)
 
-Ustun nomlari dastur tiliga bog'liq bo'lishi mumkin, shuning uchun ustunlar sarlavha matni (ru/en) bo'yicha,
-topilmasa — standart o'rni bo'yicha aniqlanadi."""
+Ustun nomlari dastur tiliga bog'liq bo'lishi mumkin, shuning uchun hamma narsa katak o'rni va qator ko'rinishi
+bo'yicha aniqlanadi — sarlavha matniga tayanilmaydi."""
 import json
 import re
 from collections import defaultdict
+from functools import lru_cache
 from datetime import date, datetime
 from io import BytesIO
 
@@ -34,91 +35,25 @@ def _n(v) -> str:
     return re.sub(r"\s+", " ", _TAG.sub(" ", str(v or ""))).strip().lower().rstrip(":")
 
 
-# kalit: ([sarlavha variantlari], standart o'rin)
-SPEC = {
-    "area": {"ncols": 16, "title": ["area information report"], "file": ["areainformation", "area_information"],
-             "cols": {"esp": (["esp name", "название эсп", "эсп"], 4), "ss": (["substation", "подстанция"], 6),
-                      "fd": (["feeder", "фидер"], 8), "tr": (["tr", "тп"], 10),
-                      "mgr": (["manager name", "имя менеджера"], 12)}},
-    "status": {"ncols": 11, "title": ["commissioning status", "отчет о статусе ввода"], "file": ["commissioning"],
-               "cols": {"esp": (["название эсп", "esp name"], 1),
-                        "tr": (["номер трансформатора", "transformer no.", "transformer number"], 2),
-                        "dcu": (["номер концентратора данных", "data concentrator no.", "data concentrator number"], 3),
-                        "pcs": (["установлено(pcs)", "installed(pcs)"], 7),
-                        "poll": (["однодневный опрос %", "one-day polling %", "one day polling %"], 10)}},
-    "direct": {"ncols": 13, "title": ["сведения о прямых подключениях", "direct"], "file": ["directmeter", "direct_meter"],
-               "cols": {"esp": (["esp name", "название эсп"], 1), "ss": (["substation", "подстанция"], 3),
-                        "fd": (["feeder", "фидер"], 4), "tr": (["tr", "тп"], 5), "meter": (["meter no.", "номер счетчика"], 6),
-                        "acc": (["account id", "лицевой счет потребителя"], 7), "ctype": (["customer type", "тип потребителя"], 8),
-                        "name": (["name", "имя потребителя"], 9), "addr": (["customer address", "адрес установки"], 10),
-                        "mtype": (["meter type", "тип счетчика"], 11), "gps": (["gps"], 12)}},
-    "nometer": {"ncols": 16, "title": ["нет информации счетчика", "no meter"], "file": ["nometer", "no_meter"],
-                "cols": {"esp": (["эсп", "esp"], 1), "ss": (["подстанция", "substation"], 2), "fd": (["фидер", "feeder"], 3),
-                         "tr": (["номер трансформатора", "transformer no.", "transformer number"], 4),
-                         "acc": (["лицевой счет потребителя", "account id"], 5), "ctype": (["тип потребителя", "customer type"], 6),
-                         "name": (["имя потребителя", "customer name"], 7), "meter": (["номер счетчика", "meter no."], 8),
-                         "link": (["тип связи", "communication type"], 9), "mgr": (["имя менеджера", "manager name"], 10),
-                         "days": (["несобранный период (день)", "uncollected period (day)"], 12),
-                         "time": (["несобранный период (время)", "uncollected period (time)"], 13),
-                         "gps": (["gps(x,y)", "gps"], 14), "addr": (["адрес установки", "installation address"], 15)}},
-    "online": {"ncols": 19, "title": ["отчет по мониторингу сетевых", "device network", "online device"], "file": ["online_device", "onlinedevice"],
-               "cols": {"esp": (["эсп", "esp"], 0), "ss": (["подстанция", "substation"], 1), "fd": (["фидер", "feeder"], 2),
-                        "tr": (["тп", "tr"], 3), "dev": (["№ устройства", "device no.", "device no"], 5),
-                        "st": (["статус", "status"], 6), "time": (["время онлайна/офлайна", "online/offline time"], 7),
-                        "lat": (["широта", "latitude"], 9), "lon": (["долгота", "longitude"], 10),
-                        "mgr": (["имя менеджера", "manager name"], 15)}},
+# Ustunlar faqat KATAK O'RNI bo'yicha olinadi (sarlavha matni dastur tiliga qarab o'zgarishi mumkin, shuning uchun
+# hech qayerda sarlavha nomiga tayanilmaydi). Fayl turi ham ma'lumot qatorining ko'rinishidan aniqlanadi.
+POS = {
+    "area": {"esp": 4, "ss": 6, "fd": 8, "trc": 9, "tr": 10, "mgr": 12},
+    "status": {"esp": 1, "tr": 2, "dcu": 3, "pcs": 7, "poll": 10},
+    "direct": {"esp": 1, "ss": 3, "fd": 4, "tr": 5, "meter": 6, "acc": 7, "ctype": 8, "name": 9, "addr": 10, "mtype": 11, "gps": 12},
+    "nometer": {"esp": 1, "ss": 2, "fd": 3, "tr": 4, "acc": 5, "ctype": 6, "name": 7, "meter": 8, "link": 9, "mgr": 10,
+                "days": 12, "time": 13, "gps": 14, "addr": 15},
+    "online": {"esp": 0, "ss": 1, "fd": 2, "tr": 3, "dev": 5, "st": 6, "time": 7, "lat": 9, "lon": 10, "mgr": 15},
 }
+FILE_HINT = {"area": ("areainformation", "area_information"), "status": ("commissioning",),
+             "direct": ("directmeter", "direct_meter"), "nometer": ("nometer", "no_meter"),
+             "online": ("online_device", "onlinedevice")}
+_DIG = re.compile(r"^\d+$")
+_TIME = re.compile(r"^\d{1,4}:\d{2}")
 
 
 class DailyError(Exception):
     """Foydalanuvchiga ko'rsatiladigan xato."""
-
-
-# ----------------------------------------------------------------------------------------- o'qish
-def _header_pos(row, kind: str) -> dict[str, int]:
-    """Bitta qator bo'yicha ustun o'rinlari: {kalit: indeks} (sarlavha bo'yicha topilganlar)."""
-    cells = [_n(c) for c in row]
-    pos = {}
-    for key, (names, _d) in SPEC[kind]["cols"].items():
-        for i, c in enumerate(cells):
-            if c in names:
-                pos[key] = i
-                break
-    return pos
-
-
-def _peek(src, limit: int = 12) -> list[tuple]:
-    wb = openpyxl.load_workbook(src, read_only=True, data_only=True)
-    try:
-        ws = wb.worksheets[0]
-        ws.reset_dimensions()      # ba'zi eksportlarda o'lcham noto'g'ri yoziladi (1x1)
-        return [tuple(r) for _i, r in zip(range(limit), ws.iter_rows(values_only=True))]
-    finally:
-        wb.close()
-
-
-def detect(src, filename: str = "") -> tuple[str, int]:
-    """Fayl turini sarlavha, nom va ustunlar soniga qarab aniqlaydi → (tur, sarlavha qatori indeksi)."""
-    try:
-        rows = _peek(src)
-    except Exception as e:  # noqa: BLE001
-        raise DailyError(f"«{filename}» — Excel (.xlsx) faylni o'qib bo'lmadi") from e
-    title = _n(rows[0][0]) if rows and rows[0] else ""
-    fname = re.sub(r"[^a-z0-9_]", "", (filename or "").lower())
-    best = (0, None, 0)
-    for kind, sp in SPEC.items():
-        score = 5 * any(t in title for t in sp["title"]) + 5 * any(t in fname for t in sp["file"])
-        hrow, hits = 0, 0
-        for i, r in enumerate(rows):
-            h = len(_header_pos(r, kind))
-            if h > hits:
-                hrow, hits = i, h
-        score += hits
-        if score > best[0]:
-            best = (score, kind, hrow)
-    if not best[1] or best[0] < 4:
-        raise DailyError(f"«{filename}» — fayl turi aniqlanmadi (5 ta kutilgan fayldan biri emas)")
-    return best[1], best[2]
 
 
 def _s(v) -> str:
@@ -136,39 +71,71 @@ def _num(v) -> float | None:
         return None
 
 
+def _c(r, i: int) -> str:
+    return _s(r[i]) if i < len(r) else ""
+
+
+def _is_data(kind: str, r) -> bool:
+    """Qator shu turdagi fayl ma'lumot qatorimi? Sarlavha, sarlavhadan oldingi qatorlar va «Jami» qatorlari o'tmaydi."""
+    n = len(r)
+    if kind == "area":
+        return n >= 13 and bool(_c(r, 4)) and all(_DIG.match(_c(r, i)) for i in (1, 3, 5, 7, 9))
+    if kind == "status":
+        return (11 <= n <= 12 and _num(_c(r, 0)) is not None and bool(_c(r, 1)) and _num(_c(r, 1)) is None
+                and bool(_c(r, 2)) and _num(_c(r, 7)) is not None and (_num(_c(r, 10)) is not None or not _c(r, 10)))
+    if kind == "direct":
+        return (13 <= n <= 14 and _num(_c(r, 0)) is not None and bool(_c(r, 1)) and _DIG.match(_c(r, 2)) is not None
+                and bool(_c(r, 6)) and bool(_c(r, 7)))
+    if kind == "nometer":
+        return (n >= 15 and _num(_c(r, 0)) is not None and bool(_c(r, 1)) and _num(_c(r, 12)) is not None
+                and _TIME.match(_c(r, 13)) is not None)
+    if kind == "online":
+        return n >= 16 and bool(_c(r, 0)) and bool(_c(r, 5)) and _dt(_c(r, 7)) is not None
+    return False
+
+
+def _peek(src, limit: int = 15) -> list[tuple]:
+    wb = openpyxl.load_workbook(src, read_only=True, data_only=True)
+    try:
+        ws = wb.worksheets[0]
+        ws.reset_dimensions()      # ba'zi eksportlarda o'lcham noto'g'ri yoziladi (1x1)
+        return [tuple(r) for _i, r in zip(range(limit), ws.iter_rows(values_only=True))]
+    finally:
+        wb.close()
+
+
+def detect(src, filename: str = "") -> tuple[str, int]:
+    """Fayl turini ma'lumot qatorlarining ko'rinishiga qarab aniqlaydi (sarlavha matniga qaramaydi) → (tur, 0)."""
+    try:
+        rows = _peek(src)
+    except Exception as e:  # noqa: BLE001
+        raise DailyError(f"«{filename}» — Excel (.xlsx) faylni o'qib bo'lmadi") from e
+    fname = re.sub(r"[^a-z0-9_]", "", (filename or "").lower())
+    best, best_kind = 0.0, None
+    for kind in KINDS:
+        score = float(sum(_is_data(kind, r) for r in rows))
+        if score and any(h in fname for h in FILE_HINT[kind]):
+            score += 0.5            # faqat teng holatda yordam beradi
+        if score > best:
+            best, best_kind = score, kind
+    if not best_kind:
+        raise DailyError(f"«{filename}» — fayl turi aniqlanmadi: ustunlar tartibi 5 ta kutilgan fayldan birortasiga mos kelmadi")
+    return best_kind, 0
+
+
 def read(src, kind: str, hrow: int | None = None) -> list[dict]:
-    """Faylni qator-qator o'qiydi: [{kalit: matn}] (ESP nomi bo'sh qatorlar tashlanadi)."""
-    sp = SPEC[kind]
+    """Faylni o'qiydi: faqat ma'lumot qatorlari, ustunlar katak o'rni bo'yicha → [{kalit: matn}]."""
+    pos = POS[kind]
     wb = openpyxl.load_workbook(src, read_only=True, data_only=True)
     try:
         ws = wb.worksheets[0]
         ws.reset_dimensions()
-        it = ws.iter_rows(values_only=True)
-        head, out, idx = None, [], {}
-        for i, r in enumerate(it):
-            if head is None:
-                if hrow is not None and i < hrow:
-                    continue
-                pos = _header_pos(r, kind)
-                if hrow is None and len(pos) < 3:
-                    continue
-                head = r
-                miss = [k for k in sp["cols"] if k not in pos]
-                if miss and len(r) != sp["ncols"]:
-                    names = ", ".join(sp["cols"][k][0][0] for k in miss)
-                    raise DailyError(f"{LABEL[kind]}: kerakli ustunlar topilmadi ({names})")
-                idx = {k: pos.get(k, sp["cols"][k][1]) for k in sp["cols"]}
-                continue
-            if not r or idx["esp"] >= len(r):
-                continue
-            row = {k: _s(r[j]) if j < len(r) else "" for k, j in idx.items()}
-            if row["esp"] and row["esp"].lower() not in ("total", "итого", "всего"):
-                out.append(row)
-        if head is None:
-            raise DailyError(f"{LABEL[kind]}: sarlavha qatori topilmadi")
-        return out
+        out = [{k: _c(r, j) for k, j in pos.items()} for r in ws.iter_rows(values_only=True) if r and _is_data(kind, r)]
     finally:
         wb.close()
+    if not out:
+        raise DailyError(f"{LABEL[kind]}: ma'lumot qatorlari topilmadi (ustunlar tartibi kutilganidan farq qiladi)")
+    return out
 
 
 # ----------------------------------------------------------------------------------------- sozlamalar
@@ -235,14 +202,37 @@ def validate_settings(s: dict) -> str | None:
     return None
 
 
+def out_specs(s: dict) -> list[dict]:
+    """Yuboriladigan/yuklab olinadigan natija fayllari (tartib = Telegramga yuborish tartibi).
+    group — qaysi kanal/guruh ro'yxatidan standart tanlanadi; default — yuborish oynasida oldindan belgilanadimi."""
+    n, lab = s["offline_days"], day_labels(s["time_edges"])
+    sp = [
+        {"k": "img1", "ext": "png", "title": s["t1_title"], "tpl": "fn_t1", "group": "t1", "default": True},
+        {"k": "img2", "ext": "png", "title": s["t2_title"], "tpl": "fn_t2", "group": "t2", "default": True},
+        {"k": "off", "ext": "xlsx", "title": f"Offline konsentratorlar ({n} kundan ortiq)", "tpl": "fn_task", "group": "task", "default": True},
+        {"k": "low", "ext": "xlsx", "title": "Obxod olish darajasi past konsentratorlar (0-50%)", "tpl": "fn_task", "group": "task", "default": True},
+        {"k": "prim", "ext": "xlsx", "title": "To'g'ridan to'g'ri ulanish (Primichka)", "tpl": "fn_task", "group": "task", "default": True},
+    ]
+    sp += [{"k": f"nm{i}", "ext": "xlsx", "title": f"Aloqadan chiqib ketgan hisoblagichlar {l}", "tpl": "fn_task", "group": "task",
+            "default": True} for i, l in enumerate(lab)]
+    sp += [{"k": "t1", "ext": "xlsx", "title": s["t1_title"], "tpl": "fn_t1", "group": "t1", "default": False},
+           {"k": "t2", "ext": "xlsx", "title": s["t2_title"], "tpl": "fn_t2", "group": "t2", "default": False},
+           {"k": "task", "ext": "xlsx", "title": s["task_title"], "tpl": "fn_task", "group": "task", "default": False}]
+    return sp
+
+
+def spec_of(s: dict, which: str) -> dict | None:
+    return next((x for x in out_specs(s) if x["k"] == which), None)
+
+
 def file_name(s: dict, which: str, end) -> str:
-    fk, tk = next((f, t) for k, f, t in FILE_KEYS if k == which)
-    ctx = FN.context(end, None, hudud=s["region"], nom=s[tk])
-    return FN.render(s[fk], ctx, "xlsx", s[tk].replace(" ", "_") or "Hisobot")
+    sp = spec_of(s, which)
+    ctx = FN.context(end, None, hudud=s["region"], nom=sp["title"])
+    return FN.render(s[sp["tpl"]], ctx, sp["ext"], sp["title"].replace(" ", "_") or "Hisobot")
 
 
 def names_example(s: dict) -> dict:
-    return {k: file_name(s, k, "2026-11-23") for k, _f, _t in FILE_KEYS}
+    return {x["k"]: file_name(s, x["k"], "2026-11-23") for x in out_specs(s)}
 
 
 # ----------------------------------------------------------------------------------------- hisoblash
@@ -279,6 +269,11 @@ def _gps(s: str) -> tuple[float, float] | None:
         return None
     a, b = float(m[0].replace(",", ".")), float(m[1].replace(",", "."))
     return (a, b) if abs(a) > 0.001 and abs(b) > 0.001 and abs(a) <= 90 and abs(b) <= 180 else None
+
+
+def day_labels(e: list[int]) -> list[str]:
+    """Fayl nomlari uchun: har doim kun bilan (2-7 kun … 90 kundan ortiq)."""
+    return [f"{a}-{b} kun" for a, b in zip(e, e[1:])] + [f"{e[-1]} kundan ortiq"]
 
 
 def edge_labels(e: list[int]) -> list[str]:
@@ -475,16 +470,21 @@ def table_xlsx(tb: dict, region: str, end: date) -> bytes:
     return bio.getvalue()
 
 
-# ----------------------------------------------------------------------------------------- Excel: topshiriq
+# ----------------------------------------------------------------------------------------- Excel: nomma-nom ro'yxatlar
 SHEETS = [
     ("Offline kontsentratorlar", "offline", ["Qurilma raqami", "Offline vaqti", "Offline (kun)"]),
     ("Aloqasiz hisoblagichlar", "nometer", ["Hisob raqami", "Iste'molchi", "Iste'molchi turi", "Hisoblagich raqami",
                                             "Aloqa turi", "Aloqasiz (kun)", "Manzil"]),
     ("Primichka", "direct", ["Hisob raqami", "Iste'molchi", "Iste'molchi turi", "Hisoblagich raqami", "Hisoblagich turi", "Manzil"]),
 ]
+EXTRA = {"offline": SHEETS[0][2], "nometer": SHEETS[1][2], "direct": SHEETS[2][2],
+         "low": ["Konsentrator raqami", "O'rnatilgan (dona)", "Obxod (%)"]}
+WIDTHS = {"offline": [18, 20, 12], "nometer": [14, 30, 16, 16, 10, 12, 40], "direct": [14, 30, 16, 16, 18, 40],
+          "low": [18, 14, 12]}
 
 
-WIDTHS = {"offline": [18, 20, 12], "nometer": [14, 30, 16, 16, 10, 12, 40], "direct": [14, 30, 16, 16, 18, 40]}
+def _norm_tr(x: str) -> str:
+    return (x or "").strip().lstrip("0")
 
 
 def _task_rows(end: date, data: dict, order: list[str]) -> dict[str, list[dict]]:
@@ -497,7 +497,7 @@ def _task_rows(end: date, data: dict, order: list[str]) -> dict[str, list[dict]]
         return {"esp": r["esp"], "ss": r["ss"], "fd": r["fd"], "tr": r["tr"],
                 "mgr": mgr.get((r["esp"], r["ss"], r["fd"], r["tr"])) or r.get("mgr", "")}
 
-    out = {"offline": [], "nometer": [], "direct": []}
+    out = {"offline": [], "nometer": [], "direct": [], "low": []}
     seen = set()
     for r in data["online"]:
         if _n(r.get("st")) in ("online", "онлайн") or ("o", r["dev"]) in seen:
@@ -505,70 +505,233 @@ def _task_rows(end: date, data: dict, order: list[str]) -> dict[str, list[dict]]
         seen.add(("o", r["dev"]))
         t = _dt(r["time"])
         loc = (_num(r["lat"]), _num(r["lon"]))
-        out["offline"].append({**base(r), "loc": loc if all(loc) else None,
-                               "x": [r["dev"], t.strftime("%d.%m.%Y %H:%M:%S") if t else r["time"],
-                                     (end - t.date()).days if t else ""]})
+        d = (end - t.date()).days if t else None
+        out["offline"].append({**base(r), "loc": loc if all(loc) else None, "d": d,
+                               "x": [r["dev"], t.strftime("%d.%m.%Y %H:%M:%S") if t else r["time"], "" if d is None else d]})
     for r in data["nometer"]:
         k = ("n", r["meter"] or r["acc"])
         if k in seen and r["meter"]:
             continue
         seen.add(k)
-        out["nometer"].append({**base(r), "loc": _gps(r["gps"]),
+        d = _num(r["days"])
+        out["nometer"].append({**base(r), "loc": _gps(r["gps"]), "d": d,
                                "x": [r["acc"], r["name"], r["ctype"], r["meter"], r["link"],
-                                     int(_num(r["days"])) if _num(r["days"]) is not None else "", r["addr"]]})
+                                     int(d) if d is not None else "", r["addr"]]})
     for r in data["direct"]:
         k = ("d", r["meter"] or r["acc"])
         if k in seen and r["meter"]:
             continue
         seen.add(k)
-        out["direct"].append({**base(r), "loc": _gps(r["gps"]),
+        out["direct"].append({**base(r), "loc": _gps(r["gps"]), "d": None,
                               "x": [r["acc"], r["name"], r["ctype"], r["meter"], r["mtype"], r["addr"]]})
+    # obxod olish darajasi past (0–50%) konsentratorlar: podstansiya/fider/xodim «Area» faylidan TP raqami bo'yicha olinadi
+    area = {}
+    for r in data["area"]:
+        for t in (r["tr"], r["trc"]):
+            area.setdefault((r["esp"], _norm_tr(t)), r)
+    dev_loc = {r["dev"]: (_num(r["lat"]), _num(r["lon"])) for r in data["online"] if _num(r["lat"]) and _num(r["lon"])}
+    tp_loc = {}
+    for r in (*data["nometer"], *data["direct"]):
+        g = _gps(r["gps"])
+        if g:
+            tp_loc.setdefault((r["esp"], _norm_tr(r["tr"])), g)
+    low_seen = set()
+    for r in data["status"]:
+        dcu = r["dcu"]
+        if not dcu or dcu.lower() in ("none", "null", "-") or dcu in low_seen:
+            continue
+        pcs, poll = _num(r["pcs"]) or 0, _num(r["poll"]) or 0
+        if pcs <= 0 or poll > 50:
+            continue
+        low_seen.add(dcu)
+        a = area.get((r["esp"], _norm_tr(r["tr"])))
+        loc = dev_loc.get(dcu) or tp_loc.get((r["esp"], _norm_tr(r["tr"])))
+        out["low"].append({"esp": r["esp"], "ss": a["ss"] if a else "", "fd": a["fd"] if a else "",
+                           "tr": a["tr"] if a else r["tr"], "mgr": a["mgr"] if a else "", "loc": loc, "d": None,
+                           "x": [dcu, int(pcs), int(poll) if float(poll).is_integer() else round(poll, 1)]})
     for rows in out.values():      # xodim bo'yicha: bo'sh xodimlar oxirida
         rows.sort(key=lambda x: (not x["mgr"], x["mgr"].lower(), rank.get(x["esp"], 999), _nat(x["ss"]), _nat(x["fd"]), _nat(x["tr"])))
     return out
 
 
-def task_xlsx(end: date, data: dict, s: dict) -> tuple[bytes, dict]:
-    rows = _task_rows(end, data, s["esp_order"])
+def _formats(wb):
+    F = lambda **kw: wb.add_format({"font_name": "Calibri", "font_size": 11, "border": 1, "border_color": LINE, "valign": "vcenter", **kw})  # noqa: E731
+    return (F(bold=True, bg_color="#DDEBF7", align="center", text_wrap=True), F(), F(font_color="#0563C1", underline=1),
+            wb.add_format({"font_name": "Calibri", "font_size": 13, "bold": True}))
+
+
+def _write_sheet(wb, fm, name: str, heading: str, extra: list[str], widths: list[int], data_rows: list[dict]) -> None:
+    head, cell, link, ttl = fm
+    ws = wb.add_worksheet(name[:31])
+    cols = ["#", "Tuman", "Podstansiya", "Fider", "TP raqami", *extra, "Joylashuv", "Xodim(lar)"]
+    ws.write(0, 0, f"{heading} ({len(data_rows)} ta)", ttl)
+    for j, c in enumerate(cols):
+        ws.write(1, j, c, head)
+    for j, w in enumerate([6, 18, 26, 20, 10] + widths + [22, 48]):
+        ws.set_column(j, j, w)
+    lc = 5 + len(extra)
+    for i, r in enumerate(data_rows):
+        rr = 2 + i
+        ws.write_number(rr, 0, i + 1, cell)
+        for j, v in enumerate([r["esp"], r["ss"], r["fd"], r["tr"], *r["x"]], 1):
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                ws.write_number(rr, j, v, cell)
+            else:
+                ws.write_string(rr, j, v or "", cell)
+        if r["loc"]:
+            la, lo = r["loc"]
+            ws.write_url(rr, lc, f"https://www.google.com/maps?q={la:.6f},{lo:.6f}", link, f"{la:.6f}, {lo:.6f}")
+        else:
+            ws.write_blank(rr, lc, None, cell)
+        ws.write_string(rr, lc + 1, r["mgr"] or "", cell)
+    ws.freeze_panes(2, 5)
+    ws.autofilter(1, 0, 1 + max(len(data_rows), 1), len(cols) - 1)
+    ws.set_landscape()
+    ws.fit_to_pages(1, 0)
+    ws.repeat_rows(1)
+
+
+def _book(build) -> bytes:
     bio = BytesIO()
     wb = xlsxwriter.Workbook(bio, {"in_memory": True, "strings_to_urls": False, "strings_to_numbers": False})
-    F = lambda **kw: wb.add_format({"font_name": "Calibri", "font_size": 11, "border": 1, "border_color": LINE, "valign": "vcenter", **kw})  # noqa: E731
-    head = F(bold=True, bg_color="#DDEBF7", align="center", text_wrap=True)
-    cell, link = F(), F(font_color="#0563C1", underline=1)
-    ttl = wb.add_format({"font_name": "Calibri", "font_size": 13, "bold": True})
-    counts = {}
-    for name, key, extra in SHEETS:
-        ws = wb.add_worksheet(name)
-        data_rows = rows[key]
-        counts[key] = len(data_rows)
-        cols = ["#", "Tuman", "Podstansiya", "Fider", "TP raqami", *extra, "Joylashuv", "Xodim(lar)"]
-        ws.write(0, 0, f"{s['task_title']} — {end:%d.%m.%Y} — {name} ({len(data_rows)} ta)", ttl)
-        for j, c in enumerate(cols):
-            ws.write(1, j, c, head)
-        for j, w in enumerate([6, 18, 26, 20, 10] + WIDTHS[key] + [22, 48]):
-            ws.set_column(j, j, w)
-        for i, r in enumerate(data_rows):
-            rr = 2 + i
-            ws.write_number(rr, 0, i + 1, cell)
-            for j, v in enumerate([r["esp"], r["ss"], r["fd"], r["tr"], *r["x"]], 1):
-                if isinstance(v, int):
-                    ws.write_number(rr, j, v, cell)
-                else:
-                    ws.write_string(rr, j, v or "", cell)
-            lc = 5 + len(extra)
-            if r["loc"]:
-                la, lo = r["loc"]
-                ws.write_url(rr, lc, f"https://www.google.com/maps?q={la:.6f},{lo:.6f}", link, f"{la:.6f}, {lo:.6f}")
-            else:
-                ws.write_blank(rr, lc, None, cell)
-            ws.write_string(rr, lc + 1, r["mgr"] or "", cell)
-        ws.freeze_panes(2, 5)
-        ws.autofilter(1, 0, 1 + max(len(data_rows), 1), len(cols) - 1)
-        ws.set_landscape()
-        ws.fit_to_pages(1, 0)
-        ws.repeat_rows(1)
+    build(wb, _formats(wb))
     wb.close()
-    return bio.getvalue(), counts
+    return bio.getvalue()
+
+
+def task_xlsx(end: date, data: dict, s: dict) -> tuple[bytes, dict]:
+    """Eski umumiy fayl: 3 varaqli (offline / aloqasiz / primichka) — yuklab olish uchun qoldirilgan."""
+    rows = _task_rows(end, data, s["esp_order"])
+
+    def build(wb, fm):
+        for name, key, extra in SHEETS:
+            _write_sheet(wb, fm, name, f"{s['task_title']} — {end:%d.%m.%Y} — {name}", extra, WIDTHS[key], rows[key])
+    return _book(build), {k: len(rows[k]) for k in ("offline", "nometer", "direct")}
+
+
+def list_files(end: date, data: dict, s: dict) -> tuple[dict[str, bytes], dict[str, int]]:
+    """7 ta alohida nomma-nom Excel: offline (N kundan ortiq), obxod past, primichka va aloqasiz hisoblagichlar kun oraliqlari bo'yicha."""
+    rows = _task_rows(end, data, s["esp_order"])
+    n, E = s["offline_days"], s["time_edges"]
+    sets = {"off": ("offline", [r for r in rows["offline"] if r["d"] is None or r["d"] >= n]),
+            "low": ("low", rows["low"]), "prim": ("direct", rows["direct"])}
+    for i in range(len(E)):
+        hi = E[i + 1] if i + 1 < len(E) else None
+        sets[f"nm{i}"] = ("nometer", [r for r in rows["nometer"]
+                                      if r["d"] is not None and r["d"] >= E[i] and (hi is None or r["d"] < hi)])
+    files, counts = {}, {}
+    titles = {x["k"]: x["title"] for x in out_specs(s)}
+    for k, (kind, rs) in sets.items():
+        counts[k] = len(rs)
+        files[k] = _book(lambda wb, fm, k=k, kind=kind, rs=rs: _write_sheet(
+            wb, fm, titles[k], f"{titles[k]} — {end:%d.%m.%Y}", EXTRA[kind], WIDTHS[kind], rs))
+    return files, counts
+
+
+# ----------------------------------------------------------------------------------------- jadvallar → rasm (Telegram uchun)
+@lru_cache(maxsize=64)
+def _font(size: int, bold: bool = False, italic: bool = False):
+    from PIL import ImageFont
+    from ..config import BASE
+    name = "Carlito-" + ("BoldItalic" if bold and italic else "Bold" if bold else "Italic" if italic else "Regular") + ".ttf"
+    return ImageFont.truetype(str(BASE / "assets" / "fonts" / name), size)
+
+
+def _wrap(text: str, font, width: float) -> list[str]:
+    lines, cur = [], ""
+    for w in str(text).split():
+        t = f"{cur} {w}".strip()
+        if cur and font.getlength(t) > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = t
+    return lines + ([cur] if cur else [])
+
+
+def table_png(tb: dict, region: str, end: date) -> bytes:
+    """Jadvalni skrinshotdagi dizaynda rasm qilib chizadi (Excel faylidagi bilan bir xil ranglar va tartib)."""
+    from PIL import Image, ImageDraw
+    S = 1.7
+    px = lambda v: int(round(v * S))      # noqa: E731
+    NAME_W, COL_W, TOP_H, ROW_H, PAD = 215, 86, 36, 26, 10
+    HEAD_H = [32, 30, 112, 26]
+    ncols = len(tb["cols"])
+    W = NAME_W + ncols * COL_W
+    H = TOP_H + sum(HEAD_H) + (1 + len(tb["rows"])) * ROW_H
+    img = Image.new("RGB", (px(W + 2 * PAD), px(H + 2 * PAD)), "white")
+    d = ImageDraw.Draw(img)
+    X = lambda ci: PAD + (0 if ci == 0 else NAME_W + (ci - 1) * COL_W)         # noqa: E731
+    hy = [PAD + TOP_H]
+    for h in HEAD_H:
+        hy.append(hy[-1] + h)
+
+    def rect(x, y, w, h, bg):
+        d.rectangle([px(x), px(y), px(x + w), px(y + h)], fill=bg, outline=LINE, width=max(1, px(0.6)))
+
+    def label(x, y, w, h, text, color="#000000", size=12, bold=False, italic=False, rot=False, align="center", pad=5):
+        f = _font(px(size), bold, italic)
+        if rot:
+            lines = _wrap(text, f, px(h - 2 * pad))
+            lay = Image.new("RGBA", (px(h), px(w)), (0, 0, 0, 0))
+            ld, lh = ImageDraw.Draw(lay), px(size * 1.25)
+            y0 = (px(w) - lh * len(lines)) / 2
+            for i, ln in enumerate(lines):
+                ld.text(((px(h) - f.getlength(ln)) / 2, y0 + i * lh), ln, font=f, fill=color)
+            img.paste(lay.rotate(90, expand=True), (px(x), px(y)), lay.rotate(90, expand=True))
+            return
+        lines = _wrap(text, f, px(w - 2 * pad)) or [""]
+        lh = px(size * 1.25)
+        y0 = px(y) + (px(h) - lh * len(lines)) / 2
+        for i, ln in enumerate(lines):
+            tw = f.getlength(ln)
+            xx = px(x) + (px(w) - tw) / 2 if align == "center" else px(x + pad) if align == "left" else px(x + w - pad) - tw
+            d.text((xx, y0 + i * lh), ln, font=f, fill=color)
+
+    # yuqori qator: hudud va sana
+    label(PAD, PAD, NAME_W, TOP_H, "Hudud nomi:", size=14, align="right")
+    label(PAD + NAME_W + 8, PAD, 4 * COL_W, TOP_H, region, "#0066FF", 14, True, align="left", pad=0)
+    label(PAD + W - 3 * COL_W, PAD, 3 * COL_W, TOP_H, f"{end:%d.%m.%Y}", size=13, bold=True, align="right")
+    # sarlavha
+    occupied = set()
+    for ri, row in enumerate(tb["head"]):
+        ci = 0
+        for h in row:
+            while (ri, ci) in occupied:
+                ci += 1
+            for dr in range(h["rs"]):
+                for dc in range(h["cs"]):
+                    occupied.add((ri + dr, ci + dc))
+            x = X(ci)
+            w = NAME_W if ci == 0 else h["cs"] * COL_W
+            y, hh = hy[ri], sum(HEAD_H[ri:ri + h["rs"]])
+            rect(x, y, w, hh, "#DDEBF7")
+            color = "title red" if h["c"] == "title red" else h["c"].split()[-1] if h["c"] else ""
+            label(x, y, w, hh, h["l"], _COL.get(color, "#000000"), 16 if h["c"] == "name" else 13 if h["c"] in ("title", "title red") else 12,
+                  True, bool(h.get("it")), bool(h.get("rot")))
+            ci += h["cs"]
+    # qatorlar
+    y = hy[-1]
+
+    def line(name, vals, total=False):
+        nonlocal y
+        rect(PAD, y, NAME_W, ROW_H, "#FFE699" if total else "#FFFFFF")
+        label(PAD, y, NAME_W, ROW_H, name, size=13 if total else 12, bold=total, align="center" if total else "left", pad=7)
+        for i, c in enumerate(tb["cols"]):
+            bg = "#FFE699" if total else "#FFFDEF" if c.get("cream") else "#FFFFFF"
+            x = PAD + NAME_W + i * COL_W
+            rect(x, y, COL_W, ROW_H, bg)
+            v = vals.get(c["k"], 0)
+            if v:
+                label(x, y, COL_W, ROW_H, f"{int(v):,}".replace(",", " "), _COL[c.get("c", "")], 12, True, align="right", pad=8)
+        y += ROW_H
+
+    line("Jami", tb["total"], True)
+    for r in tb["rows"]:
+        line(r["name"], r["v"])
+    bio = BytesIO()
+    img.save(bio, "PNG", optimize=True)
+    return bio.getvalue()
 
 
 # ----------------------------------------------------------------------------------------- papkalar

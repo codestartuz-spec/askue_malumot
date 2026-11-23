@@ -108,6 +108,26 @@ def test_detect_kinds_by_header_and_name(tmp_path):
         D.detect(p, "x.xlsx")
 
 
+def test_detect_ignores_header_text(tmp_path):
+    """Sarlavha matni butunlay o'zgargan (boshqa til / nom) bo'lsa ham — turi va ustunlar katak o'rni bo'yicha olinadi."""
+    kinds = {"AreaInformationReport": "area", "CommissioningStatus": "status", "DirectMeter": "direct", "NoMeterData": "nometer",
+             "Online_Device_Monitroing_Report_23112026_154148": "online"}
+    for name, blob in make_files().items():
+        wb = openpyxl.load_workbook(io.BytesIO(blob))
+        ws = wb.worksheets[0]
+        kind0 = kinds[name[:-5]]
+        for row in ws.iter_rows(max_row=6):                    # sarlavha va sarlavha oldi qatorlari matnini almashtiramiz
+            if not D._is_data(kind0, tuple(c.value for c in row)):
+                for c in row:
+                    if isinstance(c.value, str):
+                        c.value = f"Zaglavie-{c.column}"
+        p = tmp_path / "unknown_name.xlsx"
+        wb.save(p)
+        kind, _ = D.detect(p, "unknown_name.xlsx")
+        assert kind == kinds[name[:-5]], name
+        assert D.read(p, kind)
+
+
 def test_edge_labels_and_categories():
     assert D.edge_labels([2, 7, 30, 90]) == ["2-7 kun", "7-30 kun", "1-3 oy", "3 oydan ortiq"]
     assert D.edge_labels([1, 5, 10]) == ["1-5 kun", "5-10 kun", "10 kundan ortiq"]
@@ -139,6 +159,15 @@ def test_full_flow_tables_and_files(client, ops):
         f = client.get(f"/api/daily/{d['id']}/file/{which}", headers=ops)
         assert f.status_code == 200 and name in f.headers["content-disposition"], f.headers
         openpyxl.load_workbook(io.BytesIO(f.content))
+    # 7 ta alohida nomma-nom fayl: offline (3 kundan ortiq) · obxod 0–50% · primichka · 2-7 / 7-30 / 30-90 / 90+ kun
+    def rows_of(which):
+        w = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/daily/{d['id']}/file/{which}", headers=ops).content)).worksheets[0]
+        return [[c.value for c in r] for r in w.iter_rows(min_row=3) if r[0].value is not None]
+    assert [len(rows_of(k)) for k in ("off", "low", "prim", "nm0", "nm1", "nm2", "nm3")] == [1, 2, 1, 1, 1, 1, 1]
+    assert rows_of("low")[0][1:5] == [ESP1, "NS A", "F1", "2"]          # 002: 40% obxod; podstansiya/fider Area faylidan
+    assert rows_of("off")[0][-1] == "ALI VALI, KARIM"           # 001 TP menejeri Area faylidan
+    img = client.get(f"/api/daily/{d['id']}/file/img1", headers=ops)
+    assert img.status_code == 200 and img.content[:8] == b"\x89PNG\r\n\x1a\n" and img.headers["content-type"] == "image/png"
     # Topshiriq fayli: 3 varaq, ustunlar tartibi, xodim bo'yicha tartiblash, bo'sh xodim oxirida, nusxasiz
     wb = openpyxl.load_workbook(io.BytesIO(client.get(f"/api/daily/{d['id']}/file/task", headers=ops).content))
     assert wb.sheetnames == ["Offline kontsentratorlar", "Aloqasiz hisoblagichlar", "Primichka"]
@@ -156,7 +185,7 @@ def test_full_flow_tables_and_files(client, ops):
     assert o.status_code == 200 and "NoMeterData.xlsx" in o.headers["content-disposition"]
     z = zipfile.ZipFile(io.BytesIO(client.get(f"/api/daily/{d['id']}/zip/orig", headers=ops).content))
     assert len(z.namelist()) == 5
-    assert len(zipfile.ZipFile(io.BytesIO(client.get(f"/api/daily/{d['id']}/zip/out", headers=ops).content)).namelist()) == 3
+    assert len(zipfile.ZipFile(io.BytesIO(client.get(f"/api/daily/{d['id']}/zip/out", headers=ops).content)).namelist()) == 12
     # Arxiv: ro'yxat, qayta yuklash (almashtiriladi), qayta hisoblash, o'chirish
     assert client.get("/api/daily", headers=ops).json()[0]["id"] == d["id"]
     r2 = _post(client, ops, make_files())
@@ -241,7 +270,9 @@ def test_send_files_to_selected_chats(client, ops, fake_tg):
     d = _wait(client, ops, _post(client, ops, make_files(), day="2026-11-18").json()["id"])
     assert client.post(f"/api/daily/{d['id']}/send", json={"files": [], "chat_ids": [cid]}, headers=ops).status_code == 400
     assert client.post(f"/api/daily/{d['id']}/send", json={"files": ["bad"], "chat_ids": [cid]}, headers=ops).status_code == 400
-    r = client.post(f"/api/daily/{d['id']}/send", json={"files": ["t1", "t2", "task"], "chat_ids": [cid], "ack": False}, headers=ops)
+    allf = [x["k"] for x in client.get(f"/api/daily/{d['id']}", headers=ops).json()["outs"] if x["default"]]
+    assert allf == ["img1", "img2", "off", "low", "prim", "nm0", "nm1", "nm2", "nm3"]
+    r = client.post(f"/api/daily/{d['id']}/send", json={"files": allf[::-1], "chat_ids": [cid], "ack": False}, headers=ops)
     assert r.status_code == 200, r.text
     for _ in range(60):
         st = client.get(f"/api/reports/send/{r.json()['id']}", headers=ops).json()
@@ -249,9 +280,15 @@ def test_send_files_to_selected_chats(client, ops, fake_tg):
             break
         time.sleep(0.2)
     assert st["status"] == "done", st
-    sent = sorted(s[1] for s in fake_tg if s[0] == "-100555")
-    assert sent == ["Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.xlsx", "Konsentratorlar_18.11.2026.xlsx",
-                    "Kunlik_topshiriq_18.11.2026.xlsx"]
+    sent = [s[1] for s in fake_tg if s[0] == "-100555"]            # tartib: avval 2 rasm, keyin 7 fayl
+    assert sent == ["Konsentratorlar_18.11.2026.png", "Aloqadan_chiqib_ketgan_hisoblagichlar_soni_18.11.2026.png",
+                    "Offline_konsentratorlar_(3_kundan_ortiq)_18.11.2026.xlsx",
+                    "Obxod_olish_darajasi_past_konsentratorlar_(0-50%)_18.11.2026.xlsx",
+                    "Togridan_togri_ulanish_(Primichka)_18.11.2026.xlsx",
+                    "Aloqadan_chiqib_ketgan_hisoblagichlar_2-7_kun_18.11.2026.xlsx",
+                    "Aloqadan_chiqib_ketgan_hisoblagichlar_7-30_kun_18.11.2026.xlsx",
+                    "Aloqadan_chiqib_ketgan_hisoblagichlar_30-90_kun_18.11.2026.xlsx",
+                    "Aloqadan_chiqib_ketgan_hisoblagichlar_90_kundan_ortiq_18.11.2026.xlsx"]
     assert not any(fake_tg.captions)                              # faqat fayl
     client.delete(f"/api/daily/{d['id']}", headers=ops)
 
