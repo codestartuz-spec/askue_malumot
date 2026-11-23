@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Table2, MapPinned, HardHat, UploadCloud, Users, ScrollText, LogOut, KeyRound, Menu, Database, X, ChevronDown, Zap, Settings as Cog, Globe2, UserRound, Phone, Send, MonitorSmartphone, FileBarChart2 } from 'lucide-react'
+import { Home, Table2, MapPinned, HardHat, UploadCloud, Users, ScrollText, LogOut, KeyRound, Menu, Database, X, ChevronDown, Zap, Settings as Cog, Globe2, UserRound, Phone, Send, MonitorSmartphone, FileBarChart2, ClipboardList } from 'lucide-react'
 import { useAuth } from './auth'
 import { Confirm, Logo, Modal, useToast } from './ui'
 import EnergyBackground from './bg'
@@ -13,6 +13,7 @@ const NAV = [
   { to: '/dinamika', icon: Table2, label: 'Kunlik dinamika', any: ['view.konsentrator', 'view.aloqa', 'view.obxod'] },
   { to: '/respublika', icon: Globe2, label: 'Respublika dinamikasi', perm: 'republic.view' },
   { to: '/ag', icon: FileBarChart2, label: 'AG dinamikasi', perm: 'ag.view' },
+  { to: '/kunlik-topshiriq', icon: ClipboardList, label: 'Kunlik topshiriq', perm: 'daily.view' },
   { to: '/xarita', icon: MapPinned, label: 'Xarita', perm: 'map.view' },
   { group: 'Boshqaruv' },
   { to: '/xabarlar', icon: Send, label: 'Xabar yuborish', any: ['telegram.message', 'telegram.journal'] },

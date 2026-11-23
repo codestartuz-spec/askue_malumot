@@ -32,7 +32,7 @@ def task(name: str):
 
 def load_all() -> None:
     """Vazifa funksiyalari ro'yxatdan o'tishi uchun ularni saqlovchi modullarni import qiladi."""
-    from .routers import ag, reports, republic, telegram  # noqa: F401
+    from .routers import ag, daily, reports, republic, telegram  # noqa: F401
     from .services import telegram as _t  # noqa: F401
 
 

@@ -10,7 +10,7 @@ from .config import settings
 from .init_db import init_db
 from .services.devices import client_ip, req_ip
 from .routers import (audit, auth, brigades, drill, dynamics, home, map as map_router, meta, posts, republic, reports, system,
-                      telegram, uploads, users, devices, ag, appsettings)
+                      telegram, uploads, users, devices, ag, appsettings, daily)
 
 
 @asynccontextmanager
@@ -34,7 +34,8 @@ async def _ip_ctx(request, call_next):
     resp = await call_next(request)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    # same-origin bo'lsa OSM plitkalari Referer'siz so'raladi va 403 «Access blocked» qaytaradi; origin yetarli.
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     resp.headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
     if request.headers.get("x-forwarded-proto") == "https":
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
@@ -43,7 +44,7 @@ async def _ip_ctx(request, call_next):
     return resp
 
 
-for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, ag, system, posts, home, devices, appsettings):
+for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, ag, system, posts, home, devices, appsettings, daily):
     app.include_router(r.router, prefix="/api")
 
 

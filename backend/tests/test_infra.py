@@ -229,3 +229,10 @@ def test_telegram_message_with_files_goes_through_outbox(client, make_user, fake
     assert st["status"] == "done", st
     assert ("-100888", "msg", 1) in fake_tg
     assert not (settings.data_dir / "outbox" / str(r.json()["id"])).exists()       # vaqtinchalik fayllar tozalandi
+
+
+def test_referrer_policy_allows_map_tiles(client):
+    """same-origin bo'lsa OSM plitkalari Referer'siz so'raladi va 403 beradi — origin yuborilishi shart."""
+    r = client.get("/api/appsettings/public")
+    assert r.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert r.headers["x-content-type-options"] == "nosniff"

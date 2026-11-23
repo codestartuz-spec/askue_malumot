@@ -10,11 +10,24 @@ import { useDebounced, useToast } from '../ui'
 import { num } from '../fmt'
 import { KIND_NAME, METER_ST, TR_ST, TR_LV, clusterIcon, glyph, meterState, pinIcon, trState } from '../mapIcons'
 
+// Plitka serverlari. OSM plitkalari Referer'siz (yoki bloklangan IP dan) 403 «Access blocked» beradi — shuning uchun
+// referrerPolicy beriladi va OSM ishlamasa avtomatik zaxira server (fb) yoqiladi.
+const OSM = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const CARTO = (v) => `https://{s}.basemaps.cartocdn.com/${v}/{z}/{x}/{y}{r}.png`
 const TILES = {
-  osm: { name: 'Xarita', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap', max: 19 },
+  osm: { name: 'Xarita', url: OSM, attr: '© OpenStreetMap', max: 19, fb: 'osm2' },
   sat: { name: "Sun'iy yo'ldosh", url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: 'Tiles © Esri', max: 19 },
-  dark: { name: "Qorong'u", url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap', max: 19, cls: 'tiles-dark' },
+  dark: { name: "Qorong'u", url: CARTO('dark_all'), attr: '© OpenStreetMap © CARTO', max: 20, sub: 'abcd', fb: 'dark2' },
 }
+const TILES_FB = {
+  osm2: { url: CARTO('rastertiles/voyager'), attr: '© OpenStreetMap © CARTO', max: 20, sub: 'abcd' },
+  dark2: { url: OSM, attr: '© OpenStreetMap', max: 19, cls: 'tiles-dark' },
+}
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+const tileLayer = (T) => L.tileLayer(T.url, {
+  attribution: T.attr, maxZoom: T.max, subdomains: T.sub || 'abc', className: T.cls || '',
+  referrerPolicy: 'strict-origin-when-cross-origin', errorTileUrl: BLANK, keepBuffer: 4, updateWhenIdle: false,
+})
 const KINDS = [
   { k: 'aholi', c: '#1d6fff' }, { k: 'ulgurji', c: '#7a3fb0' }, { k: 'balans', c: '#b46f00' }, { k: 'tr', c: '#0b2a6b' },
 ]
@@ -155,9 +168,26 @@ export default function MapPage() {
     const m = map.current
     if (!m) return
     if (tile.current) m.removeLayer(tile.current)
-    const T = TILES[layer]
-    tile.current = L.tileLayer(T.url, { attribution: T.attr, maxZoom: T.max, subdomains: 'abc', className: T.cls || '' }).addTo(m)
-    tile.current.bringToBack()
+    const T = TILES[layer] || TILES.osm
+    let ok = 0, bad = 0, swapped = false
+    const use = (cfg, listen) => {
+      if (tile.current) m.removeLayer(tile.current)
+      const lay = tileLayer(cfg).addTo(m)
+      lay.bringToBack()
+      tile.current = lay
+      if (listen) {
+        lay.on('tileload', () => { ok++ })
+        lay.on('tileerror', () => {
+          bad++
+          if (!swapped && !ok && bad >= 4 && T.fb) {           // asosiy server birorta ham plitka bermadi → zaxira
+            swapped = true
+            toast('Xarita serveri javob bermadi — zaxira xarita yoqildi', 'err')
+            use(TILES_FB[T.fb], false)
+          }
+        })
+      }
+    }
+    use(T, true)
     localStorage.setItem('askue_map_layer', layer)
   }, [layer])
 

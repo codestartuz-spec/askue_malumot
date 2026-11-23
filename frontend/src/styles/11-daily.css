@@ -1,0 +1,44 @@
+/* =====================================================================
+   v12 — «Kunlik topshiriq» bo'limi (boshqa bo'limlardan mustaqil)
+   ===================================================================== */
+.daily{display:grid;gap:16px}
+.daily .tabs{display:flex;flex-wrap:wrap}
+.daily-batch{display:grid;gap:14px}
+.daily-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+.daily-head h3{margin:0;display:flex;align-items:center;gap:10px;color:#0b2a55;font-size:18px}
+.daily-head .row-btns,.daily-dl{display:flex;flex-wrap:wrap;gap:8px}
+.sec-h{margin:0 0 14px;display:flex;align-items:center;gap:10px;color:#0b2a55;font-size:17px}
+.daily-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin-top:12px;align-items:stretch}
+.dfile{display:flex;align-items:center;gap:10px;border:1.5px solid #d6e0ee;border-radius:12px;padding:9px 12px;background:#fff;min-width:0}
+.dfile.ok{border-color:#12a150;background:#f0fbf4}
+.dfile>span{display:flex;flex-direction:column;min-width:0;flex:1}
+.dfile b{font-size:13.5px;color:#0b2a55}
+.dfile small{color:#5b6b85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.daily-go{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:14px}
+.daily-go .field{margin:0;min-width:220px}
+.daily-counts{font-size:13.5px}
+.ask-card h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;color:#9a6200}
+.ask-row{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e6edf7}
+.ask-card .btn{margin-top:12px}
+.alert{display:flex;gap:8px;align-items:flex-start;background:#fde2e2;color:#9b1c1c;border-radius:10px;padding:10px 12px;font-weight:600}
+/* jadval: skrinshotdagi dizayn */
+.daily-card{padding:0;overflow:hidden}
+.daily-top{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:15px;color:#111}
+.daily-top b{color:#0066ff}.daily-top>b:last-child{color:#000}
+.daily-table th.h-name{font-size:21px;font-weight:800;min-width:150px}
+.daily-table th.h-title{font-size:14px;font-weight:800}
+.daily-table th.rot span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:normal;max-height:160px;line-height:1.15}
+.daily-table th.it span{font-style:italic}
+.daily-table th{text-align:center;vertical-align:middle}
+.daily-table td.n{text-align:right;min-width:76px}
+.daily-table td.name{white-space:nowrap}
+/* sozlamalar */
+.daily-set{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;align-items:start}
+.daily-set .set-card{min-width:0}
+.set-pair{align-items:start}
+.esp-list{display:grid;gap:4px;margin-bottom:10px}
+.esp-row{display:flex;align-items:center;gap:8px;padding:3px 6px;border:1px solid #e1e9f5;border-radius:8px}
+.esp-row b{flex:1;font-weight:600}
+.chat-pick{display:grid;gap:12px;margin-top:10px}
+.chat-pick .chk{display:flex;gap:8px;align-items:center;font-weight:500;padding:2px 0}
+@media (max-width:700px){.daily-set{grid-template-columns:1fr}.daily-files{grid-template-columns:1fr}}

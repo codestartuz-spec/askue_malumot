@@ -162,3 +162,12 @@ login/IP/qurilma, PDF, shifrlash, Redis/navbat, migratsiya, audit va yuborish ja
 - Telegramga hisobot fayllari **faqat fayl** sifatida yuboriladi (izoh/caption yo'q). Zaxira nusxasi sadminga alohida izoh bilan ketadi.
 - Fayl nomlari Sozlamalar → Umumiy sozlamalar → «Fayl nomlari» bo'limida shablon bilan o'zgartiriladi (`{hudud} {nom} {sana} {sana_dmy} {dan} {dan_dmy} {yil} {oy} {kun} {asl}`). Kengaytma avtomatik; taqiqlangan belgilar olib tashlanadi. Kod: `backend/app/services/filenames.py`.
 - Respublika 2-sahifa: yangi «Billingda otkl. status» ustuni («soni» katagi bilan); eski PDF'lar ustunsiz ko'rinadi.
+- Xarita: OSM plitkalari 403 «Access blocked» bergan edi (Referrer-Policy `same-origin` Referer'ni olib tashlagan). Endi `strict-origin-when-cross-origin`; qorong'u xarita — CARTO dark; OSM javob bermasa avtomatik zaxira xarita yoqiladi.
+
+## v12 — «Kunlik topshiriq» bo'limi (alohida)
+- Menyu: **Kunlik topshiriq** → tablar: *Fayl yuklash*, *Arxiv*, *Sozlamalar*. Ruxsatlar: `daily.view/upload/original/send/settings/delete`.
+- Har kuni 5 ta Excel (AreaInformationReport, CommissioningStatus, DirectMeter, NoMeterData, Online_Device_Monitoring) yuklanadi; fayl turi sarlavha bo'yicha aniqlanadi. Asl fayllar `data/daily/<sana>/orig` da saqlanadi.
+- Natija: 2 ta jadval (Konsentratorlar; Aloqadan chiqib ketgan hisoblagichlar soni) — har biri alohida Excel, nomi jadval nomi + sana; hamda nomma-nom «Kunlik topshiriq» Excel (3 varaq: offline kontsentratorlar, aloqasiz hisoblagichlar, primichka; xodim bo'yicha tartiblangan, joylashuv — Google Maps havolasi).
+- Offline: faqat Online_Device faylidan; oxirgi N kun (sukut 3: 21, 22, 23.11) «shundan N kundan ortiq» ga kirmaydi. Kun oraliqlari (2/7/30/90), jadval nomlari, fayl nomi shablonlari, rayonlar tartibi, standart kanallar — bo'lim Sozlamalarida.
+- Iste'molchi turi tushunarsiz bo'lsa, yuklashda bir marta so'raladi va saqlanadi.
+- Telegram: umumiy bot va kanallar; faqat fayl yuboriladi. Jadvallar: `daily_batches`, `daily_settings` (Alembic 0003).

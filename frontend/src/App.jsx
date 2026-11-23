@@ -18,6 +18,7 @@ const Devices = lazy(() => import('./pages/Devices'))
 const Upload = lazy(() => import('./pages/Upload'))
 const Users = lazy(() => import('./pages/Users'))
 const Audit = lazy(() => import('./pages/Audit'))
+const Daily = lazy(() => import('./pages/Daily'))
 
 function Guard({ perm, any, sadmin, children }) {
   const { can, user } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/konsentratorlar" element={<Navigate to="/dinamika?t=konsentrator" replace />} />
           <Route path="/aloqa" element={<Navigate to="/dinamika?t=aloqa" replace />} />
           <Route path="/obxod" element={<Navigate to="/dinamika?t=obxod" replace />} />
+          <Route path="/kunlik-topshiriq" element={<Guard perm="daily.view"><Daily /></Guard>} />
           <Route path="/xarita" element={<Guard perm="map.view"><MapPage /></Guard>} />
           <Route path="/respublika" element={<Guard perm="republic.view"><Republic /></Guard>} />
           <Route path="/ag" element={<Guard perm="ag.view"><Ag /></Guard>} />

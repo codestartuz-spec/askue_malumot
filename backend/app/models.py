@@ -309,6 +309,30 @@ class AgReport(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
+class DailyBatch(Base):
+    """Kunlik topshiriq: bir kunda yuklangan 5 ta Excel fayl va ulardan tayyorlangan jadvallar (alohida bo'lim)."""
+    __tablename__ = "daily_batches"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_date: Mapped[date] = mapped_column(Date, unique=True)
+    status: Mapped[str] = mapped_column(String(10), default="queued")    # queued | running | ask | done | error
+    progress: Mapped[float] = mapped_column(Float, default=0)
+    message: Mapped[str] = mapped_column(String(500), default="")
+    files: Mapped[dict] = mapped_column(JSON, default=dict)             # {tur: {name, size}}
+    ask: Mapped[list] = mapped_column(JSON, default=list)               # tushunarsiz iste'molchi turlari
+    data: Mapped[dict] = mapped_column(JSON, default=dict)              # hisoblangan jadvallar
+    counts: Mapped[dict] = mapped_column(JSON, default=dict)            # topshiriq faylidagi qatorlar soni
+    uploaded_by: Mapped[str] = mapped_column(String(64), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class DailySetting(Base):
+    """Kunlik topshiriq bo'limining sozlamalari (JSON) — kv (300 belgi) ga sig'maydi, shuning uchun alohida jadval."""
+    __tablename__ = "daily_settings"
+    k: Mapped[str] = mapped_column(String(60), primary_key=True)
+    v: Mapped[str] = mapped_column(Text, default="")
+
+
 class Backup(Base):
     """Zaxira nusxalar tarixi."""
     __tablename__ = "backups"

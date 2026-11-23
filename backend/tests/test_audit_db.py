@@ -69,10 +69,10 @@ def test_audit_retention_purges_old_rows(monkeypatch):
 # ------------------------------------------------------------------ migratsiyalar
 def test_migrations_at_head_and_idempotent():
     from app import dbmigrate
-    assert dbmigrate.current() == "0002"
+    assert dbmigrate.current() == "0003"
     dbmigrate.upgrade()
     dbmigrate.upgrade()
-    assert dbmigrate.current() == "0002"
+    assert dbmigrate.current() == "0003"
 
 
 def test_legacy_database_is_upgraded():
@@ -91,7 +91,7 @@ def test_legacy_database_is_upgraded():
     assert "ix_audit_action" in {i["name"] for i in insp.get_indexes("audit")}
     with engine.connect() as c:
         assert c.execute(text("SELECT COUNT(*) FROM devices WHERE uid='legacyuid1234567890'")).scalar() == 1
-    assert dbmigrate.current() == "0002"
+    assert dbmigrate.current() == "0003"
 
 
 def test_models_match_database_schema():
