@@ -94,6 +94,57 @@ export function uploadForm(path, form, onProgress) {
   })
 }
 
+// Bitta bo'lakni (PUT, xom bayt) yuborish. Tarmoq uzilsa/server vaqtincha xato bersa — kutib, qayta urinadi.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+function putOnce(path, blob, onProgress, signal) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', BASE + path)
+    const t = getToken()
+    if (t) xhr.setRequestHeader('Authorization', `Bearer ${t}`)
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    xhr.timeout = 120000
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded)
+    const fail = (msg, retry) => { const e = new Error(msg); e.retry = retry; reject(e) }
+    xhr.onload = () => {
+      let j = {}
+      try { j = JSON.parse(xhr.responseText) } catch { /* */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(j)
+      else if (xhr.status === 401) { window.dispatchEvent(new Event('askue-logout')); fail(j.detail || 'Tizimga qayta kiring', false) }
+      else {
+        // 4xx (bo'lak buzilgan/seans yo'q) - qayta urinib ham foyda yo'q, faqat 400 SHA xatosida qayta yuboramiz
+        const retry = xhr.status >= 500 || xhr.status === 408 || xhr.status === 429 || (xhr.status === 400 && /SHA-256/.test(j.detail || ''))
+        fail(j.detail || `Xatolik (${xhr.status})`, retry)
+      }
+    }
+    xhr.onerror = () => fail("Serverga ulanib bo'lmadi", true)
+    xhr.ontimeout = () => fail('Aloqa juda sekin — vaqt tugadi', true)
+    xhr.onabort = () => fail('Bekor qilindi', false)
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.send(blob)
+  })
+}
+
+export async function putBlob(path, blob, { onProgress, onRetry, signal, tries = 8 } = {}) {
+  let last
+  for (let i = 1; i <= tries; i++) {
+    if (signal?.aborted) throw new Error('Bekor qilindi')
+    try { return await putOnce(path, blob, onProgress, signal) } catch (e) {
+      last = e
+      if (!e.retry || i === tries) break
+      onProgress?.(0)
+      const wait = Math.min(30000, 1500 * 2 ** (i - 1))
+      onRetry?.(i, wait, e.message)
+      // internet yo'q bo'lsa tiklanishini kutamiz
+      for (let w = 0; w < wait; w += 500) { if (signal?.aborted) throw new Error('Bekor qilindi'); await sleep(500) }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        await new Promise((r) => { const h = () => { window.removeEventListener('online', h); r() }; window.addEventListener('online', h); setTimeout(h, 60000) })
+      }
+    }
+  }
+  throw last
+}
+
 export const qs = (o) => {
   const p = new URLSearchParams()
   Object.entries(o).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') p.set(k, v) })

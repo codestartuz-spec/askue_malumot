@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Katta fayllar (Area/Details): yuklash va ochilgan hajm chegaralari
     max_upload_mb: int = 800
     max_unzipped_mb: int = 6000
+    # Bo'laklab yuklash (Details ~5 MB lik .csv.gz bo'laklar): bitta bo'lak chegarasi
+    max_part_mb: int = 20
+    stale_upload_hours: int = 24           # tugallanmagan bo'laklab yuklash seansi shuncha soatdan keyin tozalanadi
     send_delay_sec: float = 3.2            # Telegram chegarasi: guruhga daqiqasiga ~20 xabar
     # Audit jurnali saqlash muddati (kun). 0 — o'chirmaslik
     audit_keep_days: int = 365

@@ -1,8 +1,9 @@
 import re
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,7 @@ from ..config import settings
 from ..db import get_db
 from ..deps import log, need
 from ..models import Job, User
+from ..services import chunked
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -78,6 +80,133 @@ def upload(area: UploadFile | None = File(None), details: UploadFile | None = Fi
     return job_out(job)
 
 
+# ------------------------------------------------------------------ BO'LAKLAB YUKLASH
+# Details ~5 MB lik bo'laklarga bo'lingan (generator: ...part001-of-008.csv.gz + .manifest.json).
+# Tartib: POST /session -> PUT /{id}/area va PUT /{id}/details/{n} (har biri alohida, qayta yuborish mumkin)
+#         -> POST /{id}/finish (tekshiruv + navbatga qo'yish).
+class SessionIn(BaseModel):
+    snap_date: str | None = None
+    area_name: str | None = Field(None, max_length=200)
+    details_name: str | None = Field(None, max_length=200)
+    has_area: bool = False
+    details_parts: int = Field(0, ge=0, le=chunked.MAX_PARTS)
+    manifest: dict | None = None
+
+
+def _purge_stale(db: Session) -> None:
+    """Tugallanmagan (yarim qolgan) bo'laklab yuklash seanslarini tozalaydi."""
+    old = datetime.now() - timedelta(hours=settings.stale_upload_hours)
+    for j in db.query(Job).filter(Job.status == "uploading", Job.created_at < old).all():
+        chunked.remove_session(j.id)
+        db.delete(j)
+    db.commit()
+
+
+def _session(db: Session, jid: int) -> Job:
+    j = db.get(Job, jid)
+    if not j:
+        raise HTTPException(404, "Yuklash seansi topilmadi")
+    if j.status != "uploading":
+        raise HTTPException(409, "Bu yuklash allaqachon yakunlangan")
+    return j
+
+
+@router.post("/session")
+def start_session(body: SessionIn, user: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+    if not body.has_area and not body.details_parts:
+        raise HTTPException(400, "Kamida bitta fayl tanlang")
+    d = None
+    if body.snap_date:
+        try:
+            d = date.fromisoformat(body.snap_date)
+        except ValueError:
+            raise HTTPException(400, "Sana noto'g'ri")
+    d = d or _date_from(body.details_name) or _date_from(body.area_name) or date.today()
+    try:
+        manifest = chunked.clean_manifest(body.manifest)
+    except chunked.ChunkError as e:
+        raise HTTPException(400, str(e))
+    if manifest and body.details_parts and manifest["parts_total"] != body.details_parts:
+        raise HTTPException(400, f"Manifestda {manifest['parts_total']} ta bo'lak, siz {body.details_parts} ta tanladingiz")
+    _purge_stale(db)
+    job = Job(snap_date=d, created_by=user.username, status="uploading", stage="Fayllar yuklanmoqda",
+              area_name=body.area_name if body.has_area else None,
+              details_name=body.details_name if body.details_parts else None,
+              stats={"parts": body.details_parts, "has_area": body.has_area})
+    db.add(job)
+    db.commit()
+    if manifest:
+        chunked.save_manifest(job.id, manifest)
+    return {"id": job.id, "snap_date": d.isoformat()}
+
+
+async def _body(request: Request) -> bytes:
+    limit = settings.max_part_mb * 1048576
+    n = request.headers.get("content-length")
+    if n and n.isdigit() and int(n) > limit:
+        raise HTTPException(413, f"Bo'lak {settings.max_part_mb} MB dan katta")
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > limit:
+            raise HTTPException(413, f"Bo'lak {settings.max_part_mb} MB dan katta")
+    return bytes(data)
+
+
+@router.put("/{jid}/area")
+async def put_area(jid: int, request: Request, _: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+    _session(db, jid)
+    try:
+        return chunked.save_area(jid, await _body(request))
+    except chunked.ChunkError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.put("/{jid}/details/{n}")
+async def put_details_part(jid: int, n: int, request: Request, _: User = Depends(need("data.upload")),
+                           db: Session = Depends(get_db)):
+    j = _session(db, jid)
+    total = int((j.stats or {}).get("parts") or 0)
+    try:
+        return chunked.save_part(jid, n, total, await _body(request))
+    except chunked.ChunkError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/{jid}/received")
+def received(jid: int, _: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+    """Qaysi bo'laklar serverga yetib kelgan (uzilgandan keyin davom ettirish uchun)."""
+    _session(db, jid)
+    return chunked.received(jid)
+
+
+@router.post("/{jid}/finish")
+def finish_session(jid: int, user: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+    j = _session(db, jid)
+    st = j.stats or {}
+    total, has_area = int(st.get("parts") or 0), bool(st.get("has_area"))
+    try:
+        chunked.verify_complete(jid, total, has_area)
+    except chunked.ChunkError as e:
+        raise HTTPException(409, str(e))
+    j.area_path = str(chunked.area_file(jid)) if has_area else None
+    j.details_path = str(chunked.details_dir(jid)) if total else None
+    j.stats = None
+    j.status, j.stage, j.progress = "queued", "Navbatda", 0
+    db.commit()
+    return job_out(j)
+
+
+@router.delete("/{jid}/session")
+def abort_session(jid: int, _: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
+    j = db.get(Job, jid)
+    if j and j.status == "uploading":
+        chunked.remove_session(jid)
+        db.delete(j)
+        db.commit()
+    return {"ok": True}
+
+
 @router.get("/jobs")
 def jobs(_: User = Depends(need("data.upload")), db: Session = Depends(get_db)):
     rows = db.query(Job).order_by(Job.id.desc()).limit(15).all()
@@ -105,11 +234,8 @@ def delete_job(jid: int, user: User = Depends(need("data.delete")), db: Session 
     if j.status == "running":
         raise HTTPException(400, "Bajarilayotgan yuklashni o'chirib bo'lmaydi. Tugashini kuting")
     for p in (j.area_path, j.details_path):
-        if p:
-            try:
-                os.remove(p)
-            except OSError:
-                pass
+        chunked.remove_path(p)
+    chunked.remove_session(jid)
     d = j.snap_date
     others = db.scalar(text("SELECT COUNT(*) FROM jobs WHERE snap_date=:d AND status='done' AND id<>:i"), {"d": d, "i": jid})
     removed = 0
