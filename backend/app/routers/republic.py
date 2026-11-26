@@ -49,7 +49,7 @@ KIND = Kind(
     audit=("respublika_yuklash", "respublika_ochirish", "telegram_respublika"), post_title="Respublika dinamikasi",
     parse=_parse, count=lambda d: len(d.get("pages", [])),
     default_start=lambda end: date(end.year, end.month, 1),
-    compare=lambda a, b, base, to: R.compare(a, b, base, to), view=_view, render=_render, orig=_orig)
+    compare=lambda a, b, base, to, ref=None: R.compare(a, b, base, to, ref), view=_view, ref_start=True, render=_render, orig=_orig)
 router = make_router(KIND)
 
 

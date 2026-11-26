@@ -50,6 +50,7 @@ class Kind:
     view: Callable[[object, date | None, date, date], dict]
     render: Callable[[object, str, date | None, date, date], tuple[str, bytes]]       # → (fayl nomi, mazmun)
     orig: Callable[[date, date, str | None], str]                                    # (bd, start, saqlangan_nom) → fayl nomi
+    ref_start: bool = False               # oy boshidan rejimida oy boshi sanasidagi PDF ham solishtirishga beriladi
     router: APIRouter = field(default=None)
 
     @property
@@ -84,8 +85,15 @@ class Kind:
     def build(self, db, a, b, mode):
         aa, bb = self.pick(db, a, b, mode)
         start = bb.start_date or self.default_start(bb.end_date)
-        res = self.compare(aa.data if aa else None, bb.data, (aa.end_date if aa else start).isoformat(),
-                           bb.end_date.isoformat())
+        args = (aa.data if aa else None, bb.data, (aa.end_date if aa else start).isoformat(), bb.end_date.isoformat())
+        if self.ref_start:
+            refs = []
+            if aa is None:
+                refs = [(r.end_date.isoformat(), r.data) for r in reversed(self.dates(db))
+                        if start <= r.end_date < bb.end_date]
+            res = self.compare(*args, ref=refs)
+        else:
+            res = self.compare(*args)
         return res, (aa.end_date if aa else None), bb.end_date, start
 
     def make_file(self, db, fmt, a, b, mode="oy") -> tuple[str, bytes]:

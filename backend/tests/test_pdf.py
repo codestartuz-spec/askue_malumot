@@ -139,7 +139,10 @@ def test_republic_new_column_and_daily_difference(client, make_user):
     m = client.get("/api/republic/compare?mode=oy&b=2026-11-23", headers=h).json()
     p2 = _page(m, 2)
     assert p2["key"] == "r2" and p2["cur"]["c9"] == 2158 and any(c["m"] == "c9" for c in p2["cols"])
-    assert p2["cur"]["c1"] - p2["base"]["c1"] == -3316 and p2["warn"] == ""
+    assert p2["cur"]["c1"] - p2["base"]["c1"] == -3316
+    # «Billingda otkl. status»: PDF'da ↑↓ yo'q; oy boshidan 23.11 gacha boshqa yangi PDF yo'q → farq yo'q + ogohlantirish
+    assert p2["cur"]["c9"] == p2["base"]["c9"] and "Billingda" in p2["warn"]
+    assert any(c.get("m") == "c9" for c in p2["cols"] if c["t"] == "d")
     # eski PDF: yangi ustunsiz jadval (r2o)
     o = client.get("/api/republic/compare?mode=oy&b=2026-11-20", headers=h).json()
     assert _page(o, 2)["key"] == "r2o" and not any(c.get("m") == "c9" for c in _page(o, 2)["cols"])
@@ -262,3 +265,31 @@ def test_filename_render_is_safe():
     assert "/" not in out and "\\" not in out and out.endswith(".pdf")
     assert F.render("{asl}", F.context("2026-11-23"), "pdf", "Zaxira") == "Zaxira.pdf"      # bo'sh natija → zaxira nom
     assert len(F.render("x" * 500, ctx, "pdf")) <= F.MAX_LEN + 4
+
+
+def test_republic_billing_status_difference():
+    """«Billingda otkl. status» farqi: oy boshi PDF'iga (yoki undagi ustun bo'lmasa — keyingi yangi PDF'ga) nisbatan."""
+    import copy
+    from app.services import republic as R
+    new = R.parse_report(REP_NEW.read_bytes())
+    pg = lambda res: next(x for x in res if x["n"] == 2)           # noqa: E731
+    first = copy.deepcopy(new)
+    p = next(x for x in first["pages"] if x["n"] == 2)
+    p["cells"][9]["v"] -= 100
+    for r in p["rows"]:
+        r["cells"][9]["v"] = (r["cells"][9]["v"] or 0) - 2
+    cur = {"pages": new["pages"]}
+    # oy boshi (01.11) PDF'i bor: farq = joriy - oy boshi, tuman qatorlarida ham
+    res = pg(R.compare(None, cur, "2026-11-01", "2026-11-23", ref=[("2026-11-01", first)]))
+    assert res["cur"]["c9"] - res["base"]["c9"] == 100 and res["warn"] == ""
+    r0 = res["rows"][0]
+    assert r0["cur"]["c9"] - r0["base"]["c9"] == 2
+    # oy boshida bu ustun yo'q (eski PDF) — keyingi yangi PDF olinadi va bu aytiladi
+    old = R.parse_report(REP.read_bytes())
+    res = pg(R.compare(None, cur, "2026-11-01", "2026-11-23", ref=[("2026-11-01", old), ("2026-11-05", first)]))
+    assert res["cur"]["c9"] - res["base"]["c9"] == 100 and "05.11.2026" in res["warn"]
+    # boshqa ustunlar PDF'ning o'z ↑↓ i bo'yicha qoladi
+    assert res["cur"]["c1"] - res["base"]["c1"] == -3316
+    # kunlik: tanlangan ikki sana o'rtasida
+    res = pg(R.compare(first, cur, "2026-11-20", "2026-11-23"))
+    assert res["cur"]["c9"] - res["base"]["c9"] == 100 and res["warn"] == ""

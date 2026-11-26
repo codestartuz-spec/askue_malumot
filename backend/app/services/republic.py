@@ -182,6 +182,9 @@ LABELS = {
 # eski va yangi PDF'ni birinchi 9 ta katak bo'yicha solishtirish mumkin.
 VARIANTS = {2: {9: "old", 10: "new"}}
 COMPAT = {2: {9, 10}}
+# PDF'ning o'zida ↑↓ si BO'LMAGAN kataklar (sahifa -> katak raqamlari): ularning farqi serverda hisoblanadi —
+# kunlik rejimda tanlangan ikki sana o'rtasidagi, oy boshidan rejimda esa oy boshi sanasi PDF'iga nisbatan.
+NO_PDF_DELTA = {2: {9}}
 
 
 def comparable(page: int, a: int, b: int) -> bool:
@@ -219,7 +222,8 @@ def parse_report(data: bytes) -> dict:
     return r
 
 
-def page_values(cells: list[dict], other: list[dict] | None, strict: bool = False) -> tuple[dict, dict]:
+def page_values(cells: list[dict], other: list[dict] | None, strict: bool = False,
+                ref: list[dict] | None = None, nod: frozenset | set = frozenset()) -> tuple[dict, dict]:
     """Sahifa katak ro'yxatidan (cur, base) lug'atlari. PDF'dagi ↑↓ foiz katagidan keyin turadi — u oldingi
     sonli katakka tegishli.
 
@@ -242,6 +246,9 @@ def page_values(cells: list[dict], other: list[dict] | None, strict: bool = Fals
         if strict:
             # yangi ustun (eski PDF'da yo'q) yoki `other` topilmasa — farq yo'q (base = cur)
             base[f"c{i}"] = (other[i].get("v") or 0) if other is not None and i < len(other) else v
+        elif i in nod:
+            # PDF'da ↑↓ yo'q: oy boshi sanasidagi PDF'ning shu katagiga nisbatan (u yo'q bo'lsa — farqsiz)
+            base[f"c{i}"] = (ref[i].get("v") or 0) if ref is not None and i < len(ref) else v
         else:
             base[f"c{i}"] = v - (d[i] or 0)
     return cur, base
@@ -262,11 +269,18 @@ def spec_json(key: str) -> dict:
     return {"title": cfg["title"], "short": cfg["short"], "head": head, "cols": cols}
 
 
-def compare(a: dict | None, b: dict, base_iso: str, to_iso: str) -> list[dict]:
+def _fmt(iso: str) -> str:
+    y, m, d = iso.split("-")
+    return f"{d}.{m}.{y}"
+
+
+def compare(a: dict | None, b: dict, base_iso: str, to_iso: str, ref: list[tuple[str, dict]] | None = None) -> list[dict]:
     """Har sahifa: spetsifikatsiya + viloyat jami qatori (cur) va solishtirish (base).
 
     a berilsa (kunlik) — farq = b sanasi − a sanasi (har ikkala PDF'ning o'z sonlari). a yo'q bo'lsa — PDF'ning
-    oy boshiga nisbatan ↑↓ qiymatlari."""
+    oy boshiga nisbatan ↑↓ qiymatlari; PDF'da ↑↓ si yo'q kataklar (NO_PDF_DELTA) uchun — `ref` ro'yxatidagi
+    [(sana, PDF ma'lumoti)] (oy boshidan b gacha yuklangan sanalar, eskisidan boshlab) dan shu ustun bor eng birinchisi
+    bilan solishtiriladi (odatda oy boshi PDF'i)."""
     from . import report_spec as S
     pa = {p["n"]: p for p in (a or {}).get("pages", [])}
     strict = a is not None
@@ -280,11 +294,26 @@ def compare(a: dict | None, b: dict, base_iso: str, to_iso: str) -> list[dict]:
         if strict and (old is None or not comparable(p["n"], len(old["cells"]), len(p["cells"]))):
             warn = "Bu sahifa tanlangan sanalar PDF'larida har xil tuzilgan — farqni hisoblab bo'lmadi"
             old = None
-        cur, base = page_values(p["cells"], old["cells"] if old else None, strict)
+        nod = {i for i in NO_PDF_DELTA.get(p["n"], ()) if i < len(p["cells"])}
+        rp = None
+        if nod and not strict:
+            for r_iso, r_data in ref or []:
+                x = next((x for x in r_data.get("pages", []) if x["n"] == p["n"]), None)
+                if x is not None and len(x["cells"]) > max(nod):
+                    rp, ref_iso = x, r_iso
+                    break
+            if rp is None:
+                warn = ("«Billingda otkl. status» farqini hisoblash uchun oy boshidan shu sanagacha yangi formatdagi "
+                        "boshqa PDF yuklanmagan — bu ustunda farq ko'rsatilmaydi")
+            elif ref_iso != base_iso:
+                warn = (f"«Billingda otkl. status» farqi {_fmt(ref_iso)} sanasiga nisbatan (oy boshi "
+                        f"{_fmt(base_iso)} PDF'ida bu ustun yo'q)")
+        cur, base = page_values(p["cells"], old["cells"] if old else None, strict, rp["cells"] if rp else None, nod)
         old_rows = {r["name"]: r["cells"] for r in (old or {}).get("rows", [])}
+        ref_rows = {r["name"]: r["cells"] for r in (rp or {}).get("rows", [])}
         rows = []
         for i, r in enumerate(p.get("rows", [])):
-            rc, rb = page_values(r["cells"], old_rows.get(r["name"]), strict)
+            rc, rb = page_values(r["cells"], old_rows.get(r["name"]), strict, ref_rows.get(r["name"]), nod)
             rows.append({"id": i + 1, "name": r["name"], "cur": rc, "base": rb})
         res.append({"n": p["n"], "key": key, **spec_json(key), "cur": cur, "base": base, "rows": rows,
                     "to": to_iso, "from": base_iso, "warn": warn})
