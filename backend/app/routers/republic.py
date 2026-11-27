@@ -17,6 +17,8 @@ from .pdf_reports import MIME, Kind, Parsed, SendIn, make_router  # noqa: F401  
 def _parse(rep: dict, filename: str) -> Parsed:
     if rep.get("__is_ag"):
         raise HTTPException(400, "Bu AG dinamikasi PDF'i. «Ma'lumot yuklash» → «AG dinamikasi» bo'limidan yuklang")
+    if rep.get("__is_nation"):
+        raise HTTPException(400, "Bu respublika (barcha viloyatlar) PDF'i. «Ma'lumot yuklash» → «Respublika dinamikasi» bo'limidan yuklang")
     if not rep["pages"]:
         raise HTTPException(400, "PDF ichidan «Жами» (viloyat) qatori topilmadi — to'g'ri fayl ekanini tekshiring")
     end = rep["end"]
@@ -49,7 +51,7 @@ KIND = Kind(
     audit=("respublika_yuklash", "respublika_ochirish", "telegram_respublika"), post_title="Qashqadaryo dinamikasi",
     parse=_parse, count=lambda d: len(d.get("pages", [])),
     default_start=lambda end: date(end.year, end.month, 1),
-    compare=lambda a, b, base, to, ref=None: R.compare(a, b, base, to, ref), view=_view, ref_start=True, render=_render, orig=_orig)
+    compare=lambda a, b, base, to: R.compare(a, b, base, to), view=_view, render=_render, orig=_orig)
 router = make_router(KIND)
 
 

@@ -9,6 +9,7 @@ const NAMES = { upload: "Ma'lumot yuklash", brigada_tahrir: 'Brigada tahriri', t
   "xodim_qo'shildi": "Xodim qo'shildi", "xodim_o'zgardi": "Xodim o'zgardi", parol: 'Parol', kirish: 'Tizimga kirdi', chiqish: 'Tizimdan chiqdi',
   kirish_xato: 'Kirish xatosi', qurilma_blok: 'Qurilma bloklandi', qurilma_ochildi: 'Qurilma ochildi', qurilma_chiqarish: 'Qurilmadan chiqarildi',
   ag_yuklash: 'AG PDF yuklandi', ag_ochirish: "AG ma'lumoti o'chirildi", telegram_ag: 'AG Telegramga yuborildi',
+  nation_yuklash: 'Respublika PDF yuklandi', nation_ochirish: "Respublika ma'lumoti o'chirildi", telegram_nation: 'Respublika Telegramga yuborildi',
   audit_eksport: 'Jurnal eksporti', sozlama: "Sozlama o'zgardi" }
 const label = (a) => NAMES[a] || a
 const EMPTY = { q: '', user: '', action: '', ip: '', date_from: '', date_to: '' }

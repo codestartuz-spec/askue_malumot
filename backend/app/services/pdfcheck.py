@@ -62,7 +62,7 @@ def _dec(o):
 
 
 def parse_isolated(kind: str, data: bytes) -> dict:
-    """kind: 'republic' | 'ag'. Alohida Python jarayonida o'qiydi (python -I: begona kod yuklanmaydi)."""
+    """kind: 'republic' | 'ag' | 'nation'. Alohida Python jarayonida o'qiydi (python -I: begona kod yuklanmaydi)."""
     try:
         code = f"import sys; sys.path.insert(0, {str(BASE)!r}); from app.services.pdfcheck import _main; _main(sys.argv[1])"
         p = subprocess.run([sys.executable, "-I", "-c", code, kind], input=data, capture_output=True,
@@ -94,9 +94,17 @@ def _main(kind: str) -> None:
         if kind == "ag":
             from . import ag
             res = ag.parse_pdf(data)
+        elif kind == "nation":
+            from . import nation
+            res = nation.parse_report(data) if nation.looks_like(data) else {"start": None, "end": None, "pages": []}
         else:
-            from . import ag, republic
-            res = {"__is_ag": True} if ag.looks_like_ag(data) else republic.parse_report(data)
+            from . import ag, nation, republic
+            if ag.looks_like_ag(data):
+                res = {"__is_ag": True}
+            elif nation.looks_like(data):
+                res = {"__is_nation": True}
+            else:
+                res = republic.parse_report(data)
         print(json.dumps({"ok": res}, default=_enc, ensure_ascii=False))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": f"PDF o'qib bo'lmadi ({str(e)[:160]})"}, ensure_ascii=False))

@@ -15,12 +15,16 @@ PERMS = [
      "Brigadalar, ularning xodimlari va TP'larini ko'radi", None),
     ("republic.view", "Jadvallar va sahifalar", "Qashqadaryo dinamikasi sahifasi",
      "Viloyat bo'yicha Qashqadaryo dinamikasini ko'radi va kunma-kun solishtiradi", None),
+    ("nation.view", "Jadvallar va sahifalar", "Respublika dinamikasi sahifasi",
+     "Barcha viloyatlar bo'yicha Respublika dinamikasini ko'radi, viloyatlar reytingini ko'radi va solishtiradi", None),
     ("ag.view", "Jadvallar va sahifalar", "AG dinamikasi sahifasi",
      "Aloqadan chiqib ketgan hisoblagichlar va hodisalar (AG) dinamikasini ko'radi va solishtiradi", None),
     ("data.upload", "Ma'lumot yuklash", "Kunlik ma'lumot (Area / Details) yuklash",
      "Ma'lumot yuklash sahifasi: Area/Details fayllarini yuklaydi va yuklash tarixini ko'radi", None),
     ("republic.upload", "Ma'lumot yuklash", "Respublika PDF'ini yuklash",
      "Qashqadaryo dinamikasi PDF'ini yuklaydi, yuklangan sanalar ro'yxatini ko'radi", None),
+    ("nation.upload", "Ma'lumot yuklash", "Respublika PDF'ini yuklash (barcha viloyatlar)",
+     "Respublika dinamikasi (R-Dynamic) PDF'ini yuklaydi, yuklangan sanalar ro'yxatini ko'radi", None),
     ("ag.upload", "Ma'lumot yuklash", "AG PDF'ini yuklash",
      "AG dinamikasi PDF'ini yuklaydi, yuklangan sanalar ro'yxatini ko'radi", None),
     ("data.delete", "Ma'lumot yuklash", "Yuklangan ma'lumotni o'chirish",
@@ -48,6 +52,8 @@ PERMS = [
      "Nomma-nom ro'yxatni Excel qilib saqlaydi", "drill.view"),
     ("republic.original", "Ro'yxat va hisobotlar", "Respublika asl PDF faylini ochish va yuklab olish",
      "Respublika markazi yuborgan PDF'ni brauzerda ochadi yoki yuklab oladi", "republic.view"),
+    ("nation.original", "Ro'yxat va hisobotlar", "Respublika dinamikasi asl PDF faylini ochish va yuklab olish",
+     "Respublika markazi yuborgan R-Dynamic PDF'ni brauzerda ochadi yoki yuklab oladi", "nation.view"),
     ("ag.original", "Ro'yxat va hisobotlar", "AG asl PDF faylini ochish va yuklab olish",
      "AG markazi yuborgan PDF'ni brauzerda ochadi yoki yuklab oladi", "ag.view"),
     ("dynamics.compare", "Ro'yxat va hisobotlar", "Dinamika sanalarini o'zgartirib solishtirish",
@@ -82,22 +88,22 @@ NEEDS = {p[0]: p[4] for p in PERMS if p[4]}
 _TBL = ["view.konsentrator", "view.aloqa", "view.obxod"]
 # Tayyor ruxsat to'plamlari — YAGONA manba (frontend /meta/bootstrap orqali oladi)
 PRESETS = [
-    {"name": "Kuzatuvchi", "hint": "Faqat jadvallarni ko'radi", "codes": _TBL + ["republic.view", "ag.view"]},
+    {"name": "Kuzatuvchi", "hint": "Faqat jadvallarni ko'radi", "codes": _TBL + ["republic.view", "nation.view", "ag.view"]},
     {"name": "Operator", "hint": "Jadval, xarita, ro'yxat va Excel/PDF",
      "codes": _TBL + ["republic.view", "map.view", "drill.view", "export", "dynamics.compare", "report.download",
-                      "republic.original", "ag.view", "ag.original"]},
+                      "republic.original", "nation.view", "nation.original", "ag.view", "ag.original"]},
     {"name": "Brigadir", "hint": "Brigadalar va xarita",
      "codes": _TBL + ["map.view", "brigade.view", "brigade.edit", "brigade.assign", "drill.view", "export"]},
     {"name": "Ma'lumot kiritish", "hint": "Fayl yuklaydi va o'chiradi",
      "codes": _TBL + ["republic.view", "data.upload", "republic.upload", "data.delete", "republic.original",
-                      "ag.view", "ag.upload", "ag.original"]},
+                      "nation.view", "nation.upload", "nation.original", "ag.view", "ag.upload", "ag.original"]},
     {"name": "Kunlik topshiriq", "hint": "Fayl yuklaydi, jadval tayyorlaydi va Telegramga yuboradi",
      "codes": ["daily.view", "daily.upload", "daily.recompute", "daily.download", "daily.original", "daily.send",
                "telegram.send"]},
     {"name": "Kunlik topshiriq (ko'ruvchi)", "hint": "Tayyor jadval va fayllarni ko'radi, yuklab oladi",
      "codes": ["daily.view", "daily.download"]},
     {"name": "Telegram operatori", "hint": "Hisobot va xabar yuboradi",
-     "codes": _TBL + ["republic.view", "ag.view", "report.download", "telegram.send", "telegram.message",
+     "codes": _TBL + ["republic.view", "nation.view", "ag.view", "report.download", "telegram.send", "telegram.message",
                       "telegram.journal"]},
 ]
 
@@ -122,4 +128,6 @@ INHERIT = {"data.upload": ["republic.upload", "data.delete"],
 
 # Guruh bo'yicha (bir marta): yangi bo'lim ruxsatlarini mavjud bo'lim ruxsati bor xodimlarga berish
 INHERIT_GROUPS = {"grp:ag": {"republic.view": ["ag.view"], "republic.upload": ["ag.upload"],
-                             "republic.original": ["ag.original"]}}
+                             "republic.original": ["ag.original"]},
+                  "grp:nation": {"republic.view": ["nation.view"], "republic.upload": ["nation.upload"],
+                                 "republic.original": ["nation.original"]}}

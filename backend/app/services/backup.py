@@ -19,7 +19,7 @@ from . import telegram as tg
 from .crypto import encrypt_bytes
 
 TABLES = ["users", "esps", "brigades", "brigade_members", "snapshots", "kv", "tg_chats", "tg_users", "audit",
-          "republic_reports", "ag_reports", "backups"]
+          "republic_reports", "nation_reports", "ag_reports", "backups"]
 TG_LIMIT = 49 * 1024 * 1024
 _lock = threading.Lock()
 

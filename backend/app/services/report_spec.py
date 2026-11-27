@@ -95,20 +95,20 @@ TABLES["r2o"] = {
     "cols": [n("c0", "green b"), n("c1", "red b"), t("t2"), d("c1", "bad"), n("c3", "b"), d("c3", "bad"),
              n("c4", "b"), d("c4", "bad"), n("c5", "amber"), d("c5", "bad"), n("c6", "b"), d("c6", "bad"),
              n("c7", "b"), d("c7", "bad"), n("c8", "b"), d("c8", "bad")]}
-# Yangi PDF'larda (2-sahifa) oxirida «Billingda otkl. status» ustuni bor. PDF'da uning ↑↓ si yo'q — farq serverda hisoblanadi. Eski PDF'larda — r2o.
+# Yangi PDF'larda (2-sahifa) oxirida «Billingda otkl. status» ustuni bor (↑↓ siz). Eski PDF'larda — r2o.
 TABLES["r2"] = {
     "title": "hududida CAS dasturida aloqaga chiqmagan hisoblagichlar bo'yicha", "short": "Aloqaga chiqmagan",
     "head": [
         [H("Hudud nomi", 4, 1), H("Aloqaga chiqqan hisoblagichlar soni", 4, 1, "vert green"),
-         H("Aloqadan chiqib ketgan hisoblagichlar soni", 1, 15, "red"), H("Billingda\n[otkl. status]", 3, 2)],
+         H("Aloqadan chiqib ketgan hisoblagichlar soni", 1, 15, "red"), H("Billingda\n[otkl. status]", 3, 1)],
         [H("Jami", 1, 3), H("Iste'molchi turi kesimida", 1, 6, "it"), H("Vaqtlar kesimida", 1, 6, "it")],
         [H("soni", 2, 1, "red s"), H("%", 2, 1, "s"), H("↑↓", 2, 1, "arr"), H("Aholi", 1, 2, "green"),
          H("Ulgurji", 1, 2, "blue"), H("Balans", 1, 2, "amber"), H("7-30 kun", 1, 2), H("1-3 oy", 1, 2),
          H("3 oydan ortiq", 1, 2)],
-        _S4(7)],
+        _S4(6) + [H("soni", c="red s")]],
     "cols": [n("c0", "green b"), n("c1", "red b"), t("t2"), d("c1", "bad"), n("c3", "b"), d("c3", "bad"),
              n("c4", "b"), d("c4", "bad"), n("c5", "amber"), d("c5", "bad"), n("c6", "b"), d("c6", "bad"),
-             n("c7", "b"), d("c7", "bad"), n("c8", "b"), d("c8", "bad"), n("c9", "b"), d("c9", "bad")]}
+             n("c7", "b"), d("c7", "bad"), n("c8", "b"), d("c8", "bad"), n("c9", "b")]}
 TABLES["r3"] = {
     "title": "hududida CAS dasturida tarmoqdan uzilgan hisoblagichlar bo'yicha", "short": "Tarmoqdan uzilgan",
     "head": [

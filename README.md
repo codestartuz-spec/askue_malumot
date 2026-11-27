@@ -110,7 +110,7 @@ frontend/  React: src/pages, src/tables.js (jadval tuzilmasi), dist/ (tayyor bui
 - Kunlik dinamika: aloqa jadvalidan «Aloqaga chiqqan» ustuni olib tashlandi, «Umuman aloqaga chiqmagan» uchun ↑↓ qo'shildi; PDF A4 varaqni to'liq to'ldiradi.
 - Manzil belgisi Google Maps yo'nalishini ochadi (hisoblagich va TP); qorong'u xarita kalitsiz OSM asosida.
 - Telegram: yuborish oralig'i va 429 (retry after) kutish yaxshilandi.
-- Qashqadaryo dinamikasi: «Ma'lumot yuklash → Qashqadaryo dinamikasi» orqali PDF yuklanadi; alohida sahifada kunma-kun solishtirish, PDF/Excel yuklash va Telegramga yuborish.
+- Respublika dinamikasi: «Ma'lumot yuklash → Respublika dinamikasi» orqali PDF yuklanadi; alohida sahifada kunma-kun solishtirish, PDF/Excel yuklash va Telegramga yuborish.
 - Sozlamalar: «Tizim va server holati» va «Zaxira nusxa» (har kuni 01:00, sadminga Telegram orqali; worker ishlashi shart). Tiklash: gunzip -c fayl.sql.gz | mysql -u root -p askue
 - Ruxsatlar qayta tuzildi (yangi: republic.view, system.view, backup.manage; bog'liq ruxsatlar avtomatik).
 - Yangi kutubxonalar: pdfplumber, psutil — setup.bat qayta ishga tushiring.
@@ -181,3 +181,17 @@ login/IP/qurilma, PDF, shifrlash, Redis/navbat, migratsiya, audit va yuborish ja
 - Eski jadval Excel fayllari (t1, t2) va 3 varaqli umumiy fayl yuklab olish uchun qoldirilgan (Telegramga standart yuborilmaydi).
 - Rasm Pillow bilan chiziladi (shrift: `assets/fonts/Carlito`), Telegramga `sendPhoto` orqali, izohsiz.
 - Yuborish oynasi darhol «Yuborish boshlandi» va har fayl uchun «yuborilmoqda» qatorini ko'rsatadi.
+
+## v14 — yangi bo'lim: «Respublika dinamikasi» (barcha viloyatlar)
+
+Qashqadaryo dinamikasidagi barcha imkoniyatlar respublika (R-Dynamic) PDF'i uchun alohida bo'lim sifatida qo'shildi.
+Qashqadaryo bo'limi o'z tuman PDF'lari bilan o'zgarishsiz qoladi.
+
+- **PDF o'qish** (`services/nation.py`): jadval chiziqsiz chizilgani uchun kataklar matn joylashuvi bo'yicha topiladi. Sahifalar: 1, 2, 3, 4, 6, 7, 9 (diagramma va SmartApp o'tkazib yuboriladi). Qatorlar: «Жами» + 14 viloyat; ↑↓ o'zgarishlar; sana «Динамика:» qatoridan.
+- **Sahifa** `/respublika-dinamikasi`: oy boshidan / kunlik solishtirish, **viloyatlar reytingi** (istalgan ustun bo'yicha saralash va o'rin 1–14), **Qashqadaryo qatori ajratilgan**, PDF / Excel / asl PDF / **jadval rasmlari (ZIP)** yuklash.
+- **Telegram**: PDF, Excel, asl PDF va **jadval rasmlari** (har kanalga albom/karusel) — tanlab yuboriladi.
+- **Bosh sahifa**: «Respublika dinamikasi» tabi (grafiklar va viloyatlar bo'yicha reyting diagrammalari).
+- **Ma'lumot yuklash**: «Respublika dinamikasi» tabi — bittadan PDF, ko'rish / yuklab olish / o'chirish. Qashqadaryo PDF'i bu yerga, respublika PDF'i Qashqadaryo bo'limiga yuklansa — aniq xato xabari chiqadi.
+- **Ruxsatlar** (alohida): `nation.view`, `nation.upload`, `nation.original`. Qashqadaryo ruxsatlari (`republic.*`) bor xodimlarga bir marta avtomatik beriladi; tayyor to'plamlarga ham qo'shildi.
+- Yangi jadval `nation_reports` (migratsiya 0004), fayl nomlari Sozlamalarda (`fn_nation`, `fn_nation_png`, `fn_nation_orig`). Qashqadaryo fayllari endi `Qashqadaryo_dinamikasi_{sana}` deb nomlanadi.
+- Yangi bog'liqlik: `pypdfium2` (PDF sahifani rasmga aylantirish).

@@ -17,6 +17,7 @@ PLACEHOLDERS = {
     "oy": "oy raqami, 11",
     "kun": "kun raqami, 23",
     "asl": "yuklangan asl fayl nomi (kengaytmasiz)",
+    "sahifa": "jadval nomi (rasm fayllarida), masalan Konsentratorlar",
 }
 _BASE = ("hudud", "sana", "sana_dmy", "dan", "dan_dmy", "yil", "oy", "kun")
 
@@ -24,15 +25,19 @@ _BASE = ("hudud", "sana", "sana_dmy", "dan", "dan_dmy", "yil", "oy", "kun")
 FILES = [
     ("fn_daily_region", "Kunlik dinamika — hudud hisoboti (PDF/Excel)", "Dinamika_{hudud}_{sana}", _BASE),
     ("fn_daily_district", "Kunlik dinamika — tuman hisoboti (PDF/Excel)", "Dinamika_{nom}_{sana}", _BASE + ("nom",)),
-    ("fn_republic", "Respublika dinamikasi (PDF/Excel)", "Respublika_dinamikasi_{sana}", _BASE),
-    ("fn_republic_orig", "Respublika dinamikasi — asl PDF", "{asl}", _BASE + ("asl",)),
+    ("fn_republic", "Qashqadaryo dinamikasi (PDF/Excel)", "Qashqadaryo_dinamikasi_{sana}", _BASE),
+    ("fn_republic_orig", "Qashqadaryo dinamikasi — asl PDF", "{asl}", _BASE + ("asl",)),
+    ("fn_nation", "Respublika dinamikasi (PDF/Excel)", "Respublika_dinamikasi_{sana}", _BASE),
+    ("fn_nation_png", "Respublika dinamikasi — jadval rasmlari", "Respublika_{sahifa}_{sana}", _BASE + ("sahifa",)),
+    ("fn_nation_orig", "Respublika dinamikasi — asl PDF", "{asl}", _BASE + ("asl",)),
     ("fn_ag", "AG dinamikasi (PDF/Excel)", "AG_dinamikasi_{sana}", _BASE),
     ("fn_ag_orig", "AG dinamikasi — asl PDF", "{asl}", _BASE + ("asl",)),
 ]
 ALLOWED = {k: set(p) for k, _l, _d, p in FILES}
 DEFAULT = {k: d for k, _l, d, _p in FILES}
-_FALLBACK = {"fn_daily_region": "Dinamika", "fn_daily_district": "Dinamika", "fn_republic": "Respublika_dinamikasi",
-             "fn_republic_orig": "Respublika_dinamikasi", "fn_ag": "AG_dinamikasi", "fn_ag_orig": "AG_dinamikasi"}
+_FALLBACK = {"fn_daily_region": "Dinamika", "fn_daily_district": "Dinamika", "fn_republic": "Qashqadaryo_dinamikasi",
+             "fn_republic_orig": "Qashqadaryo_dinamikasi", "fn_nation": "Respublika_dinamikasi",
+             "fn_nation_png": "Respublika", "fn_nation_orig": "Respublika_dinamikasi", "fn_ag": "AG_dinamikasi", "fn_ag_orig": "AG_dinamikasi"}
 _PH = re.compile(r"\{([^{}]*)\}")
 _BAD = re.compile(r"[\\/:*?\"<>|\x00-\x1f]")
 MAX_LEN = 120
@@ -92,7 +97,7 @@ def validate(key: str, template: str) -> str | None:
 
 
 def sample_ctx(region: str) -> dict[str, str]:
-    return context("2026-11-23", "2026-11-01", hudud=region, nom="Muborak t.", asl="Qashqadaryo_HETK_dynamic")
+    return context("2026-11-23", "2026-11-01", hudud=region, nom="Muborak t.", asl="Qashqadaryo_HETK_dynamic", sahifa="Konsentratorlar")
 
 
 def preview(key: str, template: str, region: str, ext: str = "pdf") -> str:

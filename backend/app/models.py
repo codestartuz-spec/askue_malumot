@@ -297,6 +297,18 @@ class RepublicReport(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
+class NationReport(Base):
+    """Respublika dinamikasi (barcha viloyatlar): har bir yuklangan R-Dynamic PDF — «Жами» va 14 viloyat qatori."""
+    __tablename__ = "nation_reports"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    end_date: Mapped[date] = mapped_column(Date, unique=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    filename: Mapped[str] = mapped_column(String(200), default="")
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    uploaded_by: Mapped[str] = mapped_column(String(64), default="")
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
 class AgReport(Base):
     """AG dinamikasi: har bir yuklangan PDF (boshlang'ich sanadan shu sanagacha) — hududlar kesimidagi jadval."""
     __tablename__ = "ag_reports"

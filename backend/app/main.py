@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .init_db import init_db
 from .services.devices import client_ip, req_ip
-from .routers import (audit, auth, brigades, drill, dynamics, home, map as map_router, meta, posts, republic, reports, system,
+from .routers import (audit, auth, brigades, drill, dynamics, home, map as map_router, meta, posts, republic, nation, reports, system,
                       telegram, uploads, users, devices, ag, appsettings, daily)
 
 
@@ -44,7 +44,7 @@ async def _ip_ctx(request, call_next):
     return resp
 
 
-for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, ag, system, posts, home, devices, appsettings, daily):
+for r in (auth, users, meta, dynamics, drill, brigades, uploads, audit, map_router, telegram, reports, republic, nation, ag, system, posts, home, devices, appsettings, daily):
     app.include_router(r.router, prefix="/api")
 
 

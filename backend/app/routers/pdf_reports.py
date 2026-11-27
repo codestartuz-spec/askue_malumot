@@ -23,7 +23,7 @@ from ..services import posts as P
 from ..services import telegram as tg
 from ..tasks import submit, task
 
-MIME = {"pdf": "application/pdf", "orig": "application/pdf",
+MIME = {"pdf": "application/pdf", "orig": "application/pdf", "png": "image/png",
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 KINDS: dict[str, "Kind"] = {}
 
@@ -50,7 +50,7 @@ class Kind:
     view: Callable[[object, date | None, date, date], dict]
     render: Callable[[object, str, date | None, date, date], tuple[str, bytes]]       # → (fayl nomi, mazmun)
     orig: Callable[[date, date, str | None], str]                                    # (bd, start, saqlangan_nom) → fayl nomi
-    ref_start: bool = False               # oy boshidan rejimida oy boshi sanasidagi PDF ham solishtirishga beriladi
+    images: Callable | None = None        # (res, ad, bd, start) → [(fayl nomi, PNG)] — jadval rasmlari (ixtiyoriy)
     router: APIRouter = field(default=None)
 
     @property
@@ -85,16 +85,15 @@ class Kind:
     def build(self, db, a, b, mode):
         aa, bb = self.pick(db, a, b, mode)
         start = bb.start_date or self.default_start(bb.end_date)
-        args = (aa.data if aa else None, bb.data, (aa.end_date if aa else start).isoformat(), bb.end_date.isoformat())
-        if self.ref_start:
-            refs = []
-            if aa is None:
-                refs = [(r.end_date.isoformat(), r.data) for r in reversed(self.dates(db))
-                        if start <= r.end_date < bb.end_date]
-            res = self.compare(*args, ref=refs)
-        else:
-            res = self.compare(*args)
+        res = self.compare(aa.data if aa else None, bb.data, (aa.end_date if aa else start).isoformat(),
+                           bb.end_date.isoformat())
         return res, (aa.end_date if aa else None), bb.end_date, start
+
+    def make_images(self, db, a, b, mode="oy") -> list[tuple[str, bytes]]:
+        if not self.images:
+            raise HTTPException(400, "Bu bo'lim uchun rasm yo'q")
+        res, ad, bd, start = self.build(db, a, b, mode)
+        return self.images(res, ad, bd, start)
 
     def make_file(self, db, fmt, a, b, mode="oy") -> tuple[str, bytes]:
         res, ad, bd, start = self.build(db, a, b, mode)
@@ -190,9 +189,19 @@ def make_router(kind: Kind) -> APIRouter:
     def download(fmt: str = "pdf", a: str | None = None, b: str | None = None, mode: str = "oy",
                  _: User = Depends(need(f"{k}.view")), user: User = Depends(need("report.download")),
                  db: Session = Depends(get_db)):
-        if fmt not in MIME:
+        if fmt not in MIME or (fmt == "png" and not kind.images):
             raise HTTPException(400, "Noto'g'ri format")
         _guard_orig(kind, user, [fmt])
+        if fmt == "png":                                  # barcha jadval rasmlari bitta ZIP'da
+            import io
+            import zipfile
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+                for n_, b_ in kind.make_images(db, a, b, mode):
+                    z.writestr(n_, b_)
+            bd_ = kind.build(db, a, b, mode)[2]
+            return Response(buf.getvalue(), media_type="application/zip", headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'{kind.key}_{bd_.isoformat()}_rasmlar.zip')}"})
         name, blob = kind.make_file(db, fmt, a, b, mode)
         return Response(blob, media_type=MIME[fmt],
                         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
@@ -200,7 +209,7 @@ def make_router(kind: Kind) -> APIRouter:
     @r.post("/send")
     def send(body: SendIn, user: User = Depends(need("telegram.send")), _p: User = Depends(need(f"{k}.view")),
              db: Session = Depends(get_db)):
-        if not body.fmts or any(f not in MIME for f in body.fmts):
+        if not body.fmts or any(f not in MIME or (f == "png" and not kind.images) for f in body.fmts):
             raise HTTPException(400, "Formatni tanlang (PDF / Excel)")
         _guard_orig(kind, user, body.fmts)
         chats = sendjobs.chats_for(db, body.chat_ids)
@@ -216,6 +225,38 @@ def make_router(kind: Kind) -> APIRouter:
     kind.router = r
     KINDS[k] = kind
     return r
+
+
+def _send_images(kind, job_id, chats, a, b, mode, post_id, pitems, with_ack, chat_err, last_mid, lines, flush) -> None:
+    """Jadval rasmlari: 2–10 ta rasm bitta albom (karusel) bo'lib, har bir kanalga."""
+    try:
+        with SessionLocal() as db:
+            imgs = kind.make_images(db, a, b, mode)
+    except HTTPException as e:
+        lines.append(f"✗ rasm: {e.detail}")
+        for chat_id, _t in chats:
+            chat_err[str(chat_id)] = str(e.detail)
+        return
+    if post_id:
+        for n_, _b in imgs:
+            P.add_file(post_id, n_)
+    for chat_id, title in chats:
+        iid = pitems.get(str(chat_id))
+        try:
+            mk = P.markup(iid) if (with_ack and iid) else None
+            if len(imgs) == 1:
+                res = tg.send_photo(chat_id, imgs[0][0], imgs[0][1], mk)
+            else:
+                res = tg.send_album(chat_id, imgs)
+                if mk:                                    # albomga tugma qo'yib bo'lmaydi — tugma alohida xabarda
+                    res = tg.send_text(chat_id, "Jadvallar yuborildi. Tanishib chiqqach tugmani bosing.", reply_markup=mk)
+            last_mid[str(chat_id)] = res.get("message_id")
+            lines.append(f"✓ {len(imgs)} ta jadval rasmi → {title}")
+        except tg.TgError as e:
+            lines.append(f"✗ jadval rasmlari → {title}: {e}")
+            chat_err[str(chat_id)] = str(e)
+        flush()
+        time.sleep(settings.send_delay_sec)
 
 
 @task("pdfreport.send")
@@ -234,6 +275,18 @@ def run_send(kind_key: str, job_id: int, fmts, chats, a, b, post_id: int = 0, pi
 
     try:
         for fmt in fmts:
+            is_last = fmt == fmts[-1]
+            if fmt == "png":
+                _send_images(kind, job_id, chats, a, b, mode, post_id, pitems, ack and is_last, chat_err, last_mid, lines, flush)
+                done += len(chats)
+                fails = len(chat_err)
+                if is_last:
+                    for chat_id, _t in chats:
+                        iid = pitems.get(str(chat_id))
+                        if iid:
+                            P.item_done(iid, str(chat_id) not in chat_err, last_mid.get(str(chat_id)), chat_err.get(str(chat_id), ""))
+                flush()
+                continue
             try:
                 with SessionLocal() as db:
                     name, blob = kind.make_file(db, fmt, a, b, mode)
@@ -245,7 +298,6 @@ def run_send(kind_key: str, job_id: int, fmts, chats, a, b, post_id: int = 0, pi
                 continue
             if post_id:
                 P.add_file(post_id, name)
-            is_last = fmt == fmts[-1]
             for chat_id, title in chats:
                 iid = pitems.get(str(chat_id))
                 try:

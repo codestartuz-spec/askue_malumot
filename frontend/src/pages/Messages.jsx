@@ -7,7 +7,7 @@ import { dt } from '../fmt'
 import { useAuth } from '../auth'
 import Compose from './Compose'
 
-const KIND = { xabar: { label: 'Xabar', icon: Send, cls: 'blue' }, hisobot: { label: 'Kunlik hisobot', icon: Table2, cls: 'green' }, respublika: { label: 'Respublika', icon: Globe2, cls: 'amber' }, ag: { label: 'AG', icon: FileBarChart2, cls: 'purple' } }
+const KIND = { xabar: { label: 'Xabar', icon: Send, cls: 'blue' }, hisobot: { label: 'Kunlik hisobot', icon: Table2, cls: 'green' }, respublika: { label: 'Qashqadaryo', icon: Globe2, cls: 'amber' }, republic: { label: 'Qashqadaryo', icon: Globe2, cls: 'amber' }, nation: { label: 'Respublika', icon: Globe2, cls: 'teal' }, ag: { label: 'AG', icon: FileBarChart2, cls: 'purple' } }
 
 function PostModal({ id, onClose }) {
   const [p, setP] = useState(null)
@@ -56,7 +56,7 @@ function Journal() {
   return (
     <div className="card pad journal">
       <div className="jr-top">
-        <div className="chips">{[['', 'Hammasi'], ['xabar', 'Xabarlar'], ['hisobot', 'Kunlik hisobotlar'], ['respublika', 'Respublika'], ['ag', 'AG']].map(([k, l]) => (
+        <div className="chips">{[['', 'Hammasi'], ['xabar', 'Xabarlar'], ['hisobot', 'Kunlik hisobotlar'], ['republic', 'Qashqadaryo dinamikasi'], ['nation', 'Respublika dinamikasi'], ['ag', 'AG']].map(([k, l]) => (
           <button key={k} className={`chip ${kind === k ? 'on' : ''}`} onClick={() => { setKind(k); setPage(1) }}>{l}</button>))}</div>
         <button className="icon-btn" title="Yangilash" onClick={load}><RefreshCw size={16} /></button>
       </div>

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import need, need_any
 from ..metrics import ALL_METRICS
-from ..models import RepublicReport, User, snapshots
+from ..models import NationReport, RepublicReport, User, snapshots
 
 router = APIRouter(prefix="/home", tags=["home"])
 DAYS = 30
@@ -40,9 +40,18 @@ def daily(_: User = Depends(need_any("view.konsentrator", "view.aloqa", "view.ob
             "districts": ds, "to": latest.isoformat(), "from": prev.isoformat() if prev else None}
 
 
+@router.get("/nation")
+def nation(_: User = Depends(need("nation.view")), db: Session = Depends(get_db)):
+    return _reports(db, NationReport)
+
+
 @router.get("/republic")
 def republic(_: User = Depends(need("republic.view")), db: Session = Depends(get_db)):
-    reps = list(db.scalars(select(RepublicReport).order_by(RepublicReport.end_date.desc()).limit(DAYS)))
+    return _reports(db, RepublicReport)
+
+
+def _reports(db: Session, model):
+    reps = list(db.scalars(select(model).order_by(model.end_date.desc()).limit(DAYS)))
     out = []
     for i, r in enumerate(reversed(reps)):
         latest = r is reps[0] or (len(reps) > 1 and r is reps[1])

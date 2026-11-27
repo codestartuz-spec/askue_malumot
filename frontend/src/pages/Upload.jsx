@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Eye, Download, UploadCloud, FileArchive, CheckCircle2, XCircle, Clock, Loader2, AlertTriangle, CalendarDays, X, Rocket, Server, Globe2, FileText, Trash2, FileBarChart2 } from 'lucide-react'
-import { api, download, openFile, putBlob, qs, uploadForm } from '../api'
+import { api, download, openFile, qs, uploadForm } from '../api'
 import { useAuth } from '../auth'
 import { Confirm, useToast } from '../ui'
 import { dmy, dt, num } from '../fmt'
@@ -29,52 +29,7 @@ function Drop({ label, hint, file, onFile, icon: Icon, accept = '.gz,.csv' }) {
   )
 }
 
-// Generator yozgan bo'laklar: Details_Qashqadaryo HETK-25-11-2026.part003-of-008.csv.gz (+ .manifest.json)
-const PART_RE = /^(.*)\.part(\d{3})-of-(\d{3})\.csv\.gz$/i
-const mb = (b) => (b / 1048576).toFixed(1)
-
-// Tanlangan fayllarni tahlil qiladi: bo'laklar to'plami / bitta fayl / xato
-function analyze(list) {
-  const files = [...list]
-  const man = files.find((f) => /\.manifest\.json$/i.test(f.name) || /\.json$/i.test(f.name))
-  const data = files.filter((f) => f !== man)
-  if (!data.length) return { error: "Details fayllari (.csv.gz) tanlanmadi" }
-  const parsed = data.map((f) => ({ f, m: f.name.match(PART_RE) }))
-  if (data.length === 1 && !parsed[0].m) return { mode: 'single', file: data[0], man }
-  if (parsed.some((x) => !x.m)) return { error: "Bo'laklar bilan birga oddiy fayl tanlangan. Faqat «…part001-of-00N.csv.gz» bo'laklarini tanlang" }
-  const stems = new Set(parsed.map((x) => x.m[1])), totals = new Set(parsed.map((x) => +x.m[3]))
-  if (stems.size > 1 || totals.size > 1) return { error: "Turli sana yoki turli to'plamdagi bo'laklar aralashib qolgan" }
-  const total = [...totals][0]
-  const byN = new Map()
-  parsed.forEach((x) => byN.set(+x.m[2], x.f))
-  const missing = []
-  for (let n = 1; n <= total; n++) if (!byN.has(n)) missing.push(n)
-  return { mode: 'parts', stem: [...stems][0], total, byN, man, missing, bytes: data.reduce((s, f) => s + f.size, 0), name: data[0].name }
-}
-
-function PartsDrop({ label, hint, info, onFiles, icon: Icon }) {
-  const ref = useRef(null)
-  const [over, setOver] = useState(false)
-  const pick = (fl) => fl && fl.length && onFiles([...fl])
-  return (
-    <div className={`drop ${over ? 'over' : ''} ${info && !info.error ? 'has' : ''}`}
-      onClick={() => ref.current.click()}
-      onDragOver={(e) => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files) }}>
-      <input ref={ref} type="file" multiple accept=".gz,.csv,.json" hidden onChange={(e) => { pick(e.target.files); e.target.value = '' }} />
-      <div className="drop-ic"><Icon size={30} /></div>
-      <b>{label}</b>
-      {!info ? <small>{hint}</small> : info.error ? <small className="err">{info.error}</small>
-        : info.mode === 'single' ? (<><span className="fname"><FileArchive size={15} />{info.file.name}</span><small>{mb(info.file.size)} MB (bitta fayl)</small></>)
-          : (<><span className="fname"><FileArchive size={15} />{info.total} ta bo'lak{info.man ? ' + manifest' : ''}</span>
-            <small>{mb(info.bytes)} MB{info.missing.length ? ` • yetishmaydi: ${info.missing.slice(0, 8).join(', ')}${info.missing.length > 8 ? ' …' : ''}` : ''}{!info.man ? ' • manifest tanlanmagan (tekshiruv kamroq)' : ''}</small></>)}
-      {info && <button className="icon-btn x" onClick={(e) => { e.stopPropagation(); onFiles(null) }} title="Olib tashlash"><X size={16} /></button>}
-    </div>
-  )
-}
-
 const STATUS = {
-  uploading: { t: 'Yuklanmoqda', c: 'amber', i: Loader2 },
   queued: { t: 'Navbatda', c: 'amber', i: Clock },
   running: { t: 'Bajarilmoqda', c: 'blue', i: Loader2 },
   done: { t: 'Tayyor', c: 'green', i: CheckCircle2 },
@@ -111,11 +66,14 @@ function JobTable({ jobs, onDelete }) {
   )
 }
 
-// Respublika va AG PDF'larini yuklash (ikkalasi bir xil jarayon)
+// Qashqadaryo, Respublika va AG PDF'larini yuklash (hammasi bir xil jarayon)
 const PDF_KINDS = {
   resp: { base: '/republic', icon: Globe2, label: 'Qashqadaryo dinamikasi', noun: 'respublika', unit: 'jadval', col: 'Jadvallar', perm: 'republic.original',
     hint: 'Qashqadaryo_HETK_dynamic-01.11.2026--20.11.2026.pdf — oy boshidan oxirgi sanagacha',
     info: "PDF ichidagi viloyat «Жами» qatori va sana avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
+  nation: { base: '/nation', icon: Globe2, label: 'Respublika dinamikasi', noun: 'respublika', unit: 'viloyat', col: 'Jadvallar', perm: 'nation.original',
+    hint: 'R-Dynamic_01.11.2026--27.11.2026.pdf — oy boshidan oxirgi sanagacha (barcha viloyatlar)',
+    info: "PDF ichidagi «Жами» va 14 viloyat qatori hamda sana avtomatik o'qiladi (1, 2, 3, 4, 6, 7 va 9-sahifalar; diagramma va SmartApp sahifalari o'tkazib yuboriladi). Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
   ag: { base: '/ag', icon: FileBarChart2, label: 'AG dinamikasi', noun: 'AG', unit: 'hudud', col: 'Hududlar', perm: 'ag.original',
     hint: 'Qashqadaryo_HETK_AG19-20.02.2023--17.11.2026.pdf — boshlang\'ich sanadan oxirgi sanagacha',
     info: "PDF ichidagi «Farq: 20.02.2023 - 17.11.2026» sanasi va barcha hududlar qatori avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
@@ -173,18 +131,20 @@ export default function Upload() {
   const tabs = [
     can('data.upload') && { k: 'kunlik', icon: UploadCloud, label: "Kunlik ma'lumot (Area / Details)" },
     can('republic.upload') && { k: 'resp', icon: Globe2, label: 'Qashqadaryo dinamikasi' },
+    can('nation.upload') && { k: 'nation', icon: Globe2, label: 'Respublika dinamikasi' },
     can('ag.upload') && { k: 'ag', icon: FileBarChart2, label: 'AG dinamikasi' },
   ].filter(Boolean)
   const want = sp.get('t') || 'kunlik'
   const tab = (tabs.find((t) => t.k === want) || tabs[0] || { k: 'kunlik' }).k
-  const sub = { resp: "Respublika markazi tayyorlagan dinamika PDF'ini (oy boshidan oxirgi sanagacha) yuklang.",
+  const sub = { nation: "Respublika markazi tayyorlagan R-Dynamic PDF'ini (barcha viloyatlar, oy boshidan oxirgi sanagacha) yuklang.",
+    resp: "Qashqadaryo HETK dinamikasi PDF'ini (tumanlar kesimida, oy boshidan oxirgi sanagacha) yuklang.",
     ag: "AG (Aloqadan chiqib ketgan hisoblagichlar va hodisalar) dinamikasi PDF'ini yuklang: «Farq: 20.02.2023 - …»." }
   return (
     <div className="upl">
       {tabs.length > 1 && <div className="tabs" role="tablist">
         {tabs.map((t) => <button key={t.k} role="tab" className={`tab ${tab === t.k ? 'on' : ''}`} onClick={() => setSp(t.k === 'kunlik' ? {} : { t: t.k }, { replace: true })}><t.icon size={18} /><span>{t.label}</span></button>)}
       </div>}
-      {tab === 'resp' || tab === 'ag' ? <><div className="card head-card"><div className="titles"><h2 className="ttl">{PDF_KINDS[tab].label}</h2><p className="sub">{sub[tab]}</p></div></div><PdfUpload key={tab} kind={tab} /></> : <DailyUpload />}
+      {tab === 'resp' || tab === 'ag' || tab === 'nation' ? <><div className="card head-card"><div className="titles"><h2 className="ttl">{PDF_KINDS[tab].label}</h2><p className="sub">{sub[tab]}</p></div></div><PdfUpload key={tab} kind={tab} /></> : <DailyUpload />}
     </div>
   )
 }
@@ -199,10 +159,7 @@ function DailyUpload() {
   }
   const toast = useToast()
   const [area, setArea] = useState(null)
-  const [detFiles, setDetFiles] = useState(null)
-  const details = detFiles && !detFiles.error ? detFiles : null
-  const abortRef = useRef(null)
-  const [sendInfo, setSendInfo] = useState('')
+  const [details, setDetails] = useState(null)
   const [date, setDate] = useState('')
   const [sending, setSending] = useState(null)   // 0..1
   const [jobs, setJobs] = useState([])
@@ -225,93 +182,38 @@ function DailyUpload() {
   }, [poll, jobs.some((j) => j.status === 'queued' || j.status === 'running')])
 
   const pick = (setter) => (f) => { setter(f); const d = f && dateFromName(f.name); if (d) setDate(d) }
-  const pickDetails = (list) => {
-    if (!list) { setDetFiles(null); return }
-    const a = analyze(list)
-    setDetFiles(a)
-    const n = a.mode === 'single' ? a.file.name : a.name
-    const d = dateFromName(n || '')
-    if (d) setDate(d)
-  }
-  const readManifest = async (f) => { try { return JSON.parse(await f.text()) } catch { throw new Error("Manifest fayli o'qilmadi (buzilgan JSON)") } }
-  // Bitta fayl (eski usul) yoki bo'laklar to'plami (tavsiya etiladi: sekin internetda ham o'tadi)
   const send = async () => {
-    if (details?.mode === 'parts') return sendParts()
     const f = new FormData()
     if (area) f.append('area', area)
-    if (details?.mode === 'single') f.append('details', details.file)
+    if (details) f.append('details', details)
     if (date) f.append('snap_date', date)
     setSending(0)
     try {
       await uploadForm('/uploads', f, setSending)
       toast("Fayllar qabul qilindi. Jarayon orqa fonda bajariladi — sahifani yopsangiz ham bo'ladi")
-      setArea(null); setDetFiles(null); poll()
+      setArea(null); setDetails(null); poll()
     } catch (e) { toast(e.message, 'err') } finally { setSending(null) }
-  }
-
-  const sendParts = async () => {
-    const ctl = new AbortController(); abortRef.current = ctl
-    const key = `askue_upl_${details.stem}_${details.total}`
-    const total = (area ? area.size : 0) + details.bytes
-    let sentBase = 0
-    setSending(0); setSendInfo('Tayyorlanmoqda…')
-    const upd = (cur = 0) => setSending(Math.min(1, (sentBase + cur) / Math.max(total, 1)))
-    const opts = (what) => ({ signal: ctl.signal, onProgress: upd, onRetry: (i, ms, m) => setSendInfo(`${what}: ${m}. ${Math.round(ms / 1000)} soniyadan keyin qayta uriniladi (${i})`) })
-    try {
-      let jid = null, got = null
-      try { jid = +localStorage.getItem(key) || null } catch { /* */ }
-      if (jid) { try { got = await api.get(`/uploads/${jid}/received`) } catch { jid = null } }   // uzilgan yuklashni davom ettirish
-      if (!jid) {
-        const manifest = details.man ? await readManifest(details.man) : null
-        const r = await api.post('/uploads/session', { snap_date: date || null, has_area: !!area, area_name: area?.name || null,
-          details_name: details.name, details_parts: details.total, manifest })
-        jid = r.id; got = { area: null, details: {} }
-        try { localStorage.setItem(key, String(jid)) } catch { /* */ }
-      }
-      if (area) {
-        if (got.area === area.size) sentBase += area.size
-        else { setSendInfo('Area fayli yuborilmoqda…'); await putBlob(`/uploads/${jid}/area`, area, opts('Area')); sentBase += area.size }
-        upd()
-      }
-      for (let n = 1; n <= details.total; n++) {
-        const f = details.byN.get(n)
-        if (got.details[n] === f.size) { sentBase += f.size; upd(); continue }
-        setSendInfo(`Bo'lak ${n} / ${details.total} yuborilmoqda (${mb(f.size)} MB)`)
-        await putBlob(`/uploads/${jid}/details/${n}`, f, opts(`Bo'lak ${n}`))
-        sentBase += f.size; upd()
-      }
-      setSendInfo('Tekshirilmoqda…')
-      await api.post(`/uploads/${jid}/finish`)
-      try { localStorage.removeItem(key) } catch { /* */ }
-      toast("Fayllar qabul qilindi. Jarayon orqa fonda bajariladi — sahifani yopsangiz ham bo'ladi")
-      setArea(null); setDetFiles(null); poll()
-    } catch (e) {
-      if (ctl.signal.aborted) toast("Yuklash to'xtatildi. «Yuklashni boshlash» ni bossangiz, yetib borgan bo'laklar qayta yuborilmaydi")
-      else toast(`${e.message}. «Yuklashni boshlash» ni qayta bossangiz — yuborilgan bo'laklar o'tkazib yuboriladi, qolgani davom etadi`, 'err')
-      poll()
-    } finally { abortRef.current = null; setSending(null); setSendInfo('') }
   }
   return (
     <>
       <div className="card head-card">
         <div className="titles"><h2 className="ttl">Ma'lumot yuklash</h2>
-          <p className="sub">Generator tayyorlagan <b>Area_…csv.gz</b> va Details <b>…part001-of-00N.csv.gz</b> bo'laklarini (<b>.manifest.json</b> bilan) yuklang — bo'laklar ~5 MB, shuning uchun sekin internetda ham o'tadi; aloqa uzilsa, davom ettiriladi. Yuklash navbat orqali orqa fonda bajariladi, kutib o'tirish shart emas.</p></div>
+          <p className="sub">Generator tayyorlagan <b>Area_…csv.gz</b> va <b>Details_…csv.gz</b> fayllarini yuklang. Yuklash navbat orqali orqa fonda bajariladi, kutib o'tirish shart emas.</p></div>
       </div>
       {!alive && <div className="alert"><Server size={18} />Worker (orqa fon jarayoni) ishlamayapti. <code>start.bat</code> orqali ishga tushiring — aks holda yuklangan fayllar navbatda turib qoladi.</div>}
       <div className="card pad">
         <div className="drops">
           <Drop icon={UploadCloud} label="Area fayli (konsentratorlar)" hint="Area_Qashqadaryo_HETK-…csv.gz" file={area} onFile={pick(setArea)} />
-          <PartsDrop icon={UploadCloud} label="Details fayli (hisoblagichlar)" hint="…part001-of-00N.csv.gz bo'laklari + .manifest.json (hammasini birdan tanlang)" info={detFiles} onFiles={pickDetails} />
+          <Drop icon={UploadCloud} label="Details fayli (hisoblagichlar)" hint="Details_Qashqadaryo_HETK-…csv.gz" file={details} onFile={pick(setDetails)} />
         </div>
         <div className="upl-row">
           <label className="field inline"><span><CalendarDays size={15} />Ma'lumot sanasi</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <small className="hint">Sana fayl nomidan olinadi. Shu sana uchun dinamika jadvali avtomatik saqlanadi; xuddi shu sana qayta yuklansa, u yangilanadi.</small>
           <div className="spacer" />
-          {sending !== null && abortRef.current && <button className="btn ghost" onClick={() => abortRef.current?.abort()}>To'xtatish</button>}
-          <button className="btn primary big" disabled={(!area && !details) || sending !== null || (details?.mode === 'parts' && details.missing.length > 0)} onClick={send}>
+          <button className="btn primary big" disabled={(!area && !details) || sending !== null} onClick={send}>
             <Rocket size={18} />{sending !== null ? `Yuborilmoqda ${Math.round(sending * 100)}%` : 'Yuklashni boshlash'}</button>
         </div>
-        {sending !== null && <><div className="progress"><div className="bar" style={{ width: `${sending * 100}%` }} /></div>{sendInfo && <div className="stage">{sendInfo}</div>}</>}
+        {sending !== null && <div className="progress"><div className="bar" style={{ width: `${sending * 100}%` }} /></div>}
         {(area || details) && !(area && details) && <div className="hint warn-hint">Eslatma: dinamika to'g'ri bo'lishi uchun ikkala faylni birga yuklash tavsiya etiladi.</div>}
       </div>
       <h3 className="sec-title">Yuklashlar tarixi</h3>

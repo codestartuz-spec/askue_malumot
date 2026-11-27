@@ -26,7 +26,7 @@ def listing(kind: str = "", page: int = 1, size: int = 25, _: User = Depends(nee
             db: Session = Depends(get_db)):
     size = max(5, min(size, 100))
     where, params = "", {"lim": size, "off": (max(page, 1) - 1) * size}
-    if kind in ("xabar", "hisobot", "respublika"):
+    if kind in ("xabar", "hisobot", "respublika", "republic", "nation", "ag"):
         where, params["k"] = "WHERE p.kind=:k", kind
     total = db.execute(text(f"SELECT COUNT(*) FROM tg_posts p {where}"), params).scalar() or 0
     rows = db.execute(text(

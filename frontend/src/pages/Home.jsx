@@ -114,15 +114,15 @@ function Daily() {
 // ----------------------------------------------------------------- Qashqadaryo dinamikasi
 const cellOf = (rep, n, i) => rep.pages.find((p) => p.n === n)?.cells[i]
 
-function Republic() {
+function PdfHome({ ep = '/home/republic', title = 'Qashqadaryo dinamikasi', area = 'Tumanlar' }) {
   const [d, setD] = useState(null)
   const [err, setErr] = useState('')
   const [mode, setMode] = useState('oy')
-  useEffect(() => { api.get('/home/republic').then(setD).catch((e) => setErr(e.message)) }, [])
+  useEffect(() => { api.get(ep).then(setD).catch((e) => setErr(e.message)) }, [])
   if (err) return <div className="card pad"><Empty icon={Globe2}>{err}</Empty></div>
   if (!d) return <Spinner />
   const reps = d.reports
-  if (!reps.length) return <div className="card pad"><Empty icon={Globe2}>Respublika PDF'i hali yuklanmagan. «Ma'lumot yuklash» → «Qashqadaryo dinamikasi» bo'limidan yuklang.</Empty></div>
+  if (!reps.length) return <div className="card pad"><Empty icon={Globe2}>PDF hali yuklanmagan. «Ma'lumot yuklash» → «{title}» bo'limidan yuklang.</Empty></div>
   const last = reps[reps.length - 1]
   const prev = reps.length > 1 ? reps[reps.length - 2] : null
   const kun = mode === 'kunlik' && !!prev
@@ -154,7 +154,7 @@ function Republic() {
   const p2pct = val(2, 2)?.p
   return (
     <>
-      <div className="home-bar"><CalendarDays size={16} />Qashqadaryo dinamikasi: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><div className="seg"><button className={mode === 'oy' ? 'on' : ''} onClick={() => setMode('oy')}>Oy boshidan</button><button className={mode === 'kunlik' ? 'on' : ''} onClick={() => setMode('kunlik')} title="Oxirgi ikki PDF farqi">Kunlik</button></div>
+      <div className="home-bar"><CalendarDays size={16} />{title}: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><div className="seg"><button className={mode === 'oy' ? 'on' : ''} onClick={() => setMode('oy')}>Oy boshidan</button><button className={mode === 'kunlik' ? 'on' : ''} onClick={() => setMode('kunlik')} title="Oxirgi ikki PDF farqi">Kunlik</button></div>
         <span className="mut">{reps.length} ta PDF • ↑↓ {kun ? `${dmy(prev.end)} ga nisbatan` : mode === 'kunlik' ? 'kunlik uchun 2-PDF kerak' : 'oy boshidan'}</span></div>
       <div className="kpis">
         {kp(Server, 'Dasturdagi TP / konsentratorlar', 1, 0, false, 'blue')}
@@ -189,9 +189,9 @@ function Republic() {
       </div>
 
       <div className="grid3">
-        <Card icon={MapPinned} title="Tumanlar: aloqadan chiqib ketgan hisoblagichlar" sub="eng ko'pdan"><HBars color="#e31e24" items={sortDesc(rowsOf(2, 1))} /></Card>
-        <Card icon={MapPinned} title="Tumanlar: tarmoqdan uzilganlar"><HBars color="#f59e0b" items={sortDesc(rowsOf(3, 1))} /></Card>
-        <Card icon={MapPinned} title="Tumanlar: obxod olish foizi" sub="eng pastdan"><HBars color="#0891b2" unit="%" max={100} items={obxPct} /></Card>
+        <Card icon={MapPinned} title={`${area}: aloqadan chiqib ketgan hisoblagichlar`} sub="eng ko'pdan"><HBars color="#e31e24" items={sortDesc(rowsOf(2, 1))} /></Card>
+        <Card icon={MapPinned} title={`${area}: tarmoqdan uzilganlar`}><HBars color="#f59e0b" items={sortDesc(rowsOf(3, 1))} /></Card>
+        <Card icon={MapPinned} title={`${area}: obxod olish foizi`} sub="eng pastdan"><HBars color="#0891b2" unit="%" max={100} items={obxPct} /></Card>
       </div>
     </>
   )
@@ -202,6 +202,7 @@ export default function Home() {
   const [sp, setSp] = useSearchParams()
   const tabs = [
     (can('view.konsentrator') || can('view.aloqa') || can('view.obxod')) && { k: 'kunlik', label: 'Kunlik dinamika', icon: Table2 },
+    can('nation.view') && { k: 'respublika_all', label: 'Respublika dinamikasi', icon: Globe2 },
     can('republic.view') && { k: 'respublika', label: 'Qashqadaryo dinamikasi', icon: Globe2 },
   ].filter(Boolean)
   if (!tabs.length) return <div className="home-blank" />
@@ -213,7 +214,9 @@ export default function Home() {
           <button key={t.k} role="tab" aria-selected={t.k === tab} className={`tab ${t.k === tab ? 'on' : ''}`} onClick={() => setSp({ t: t.k }, { replace: true })}>
             <t.icon size={18} /><span>{t.label}</span></button>))}
       </div>
-      {tab === 'kunlik' ? <Daily key="d" /> : <Republic key="r" />}
+      {tab === 'kunlik' ? <Daily key="d" /> : tab === 'respublika_all'
+        ? <PdfHome key="n" ep="/home/nation" title="Respublika dinamikasi" area="Viloyatlar" />
+        : <PdfHome key="r" />}
     </div>
   )
 }

@@ -6,7 +6,6 @@ faylda yo'qlari o'chiriladi. Brigada nomlari, xodimlar va qo'lda biriktirilgan T
 import csv
 import gzip
 import io
-import json
 import os
 import re
 from pathlib import Path
@@ -199,36 +198,8 @@ _METER_SQL = (f"INSERT INTO meters ({_METER_COLS}) VALUES ({','.join(['%s'] * 19
               + ",".join(f"{c}=VALUES({c})" for c in _METER_COLS.split(",") if c != "meter_no"))
 
 
-def details_parts(path: str) -> list[str]:
-    """path - bitta CSV(.gz) yoki bo'laklar papkasi (001.csv.gz, 002.csv.gz ...) -> o'qiladigan fayllar tartibda."""
-    p = Path(path)
-    if p.is_dir():
-        files = sorted(str(f) for f in p.iterdir() if f.is_file() and f.name.lower().endswith((".csv.gz", ".csv")))
-        if not files:
-            raise IngestError("Details bo'laklari topilmadi")
-        return files
-    return [path]
-
-
-def _expected_rows(path: str) -> int | None:
-    """Bo'laklar papkasidagi manifest.json (yoki ota papkadagi) bo'yicha kutilgan qatorlar soni."""
-    p = Path(path)
-    if not p.is_dir():
-        return None
-    for cand in (p / "manifest.json", p.parent / "manifest.json"):
-        if cand.is_file():
-            try:
-                return int(json.loads(cand.read_text(encoding="utf-8"))["rows_total"])
-            except (OSError, ValueError, KeyError, TypeError):
-                return None
-    return None
-
-
 def ingest_details(path: str, batch: int, progress) -> dict:
-    parts = details_parts(path)
-    size = max(sum(os.path.getsize(f) for f in parts), 1)
-    expected = _expected_rows(path)
-    done_bytes = 0
+    size = max(os.path.getsize(path), 1)
     with engine.begin() as conn:
         esps = {r[1]: r[0] for r in conn.execute(text("SELECT id,name FROM esps"))}
         trmap = {}
@@ -236,62 +207,54 @@ def ingest_details(path: str, batch: int, progress) -> dict:
             trmap[(r[1], r[2])] = (r[0], r[3])          # id bo'yicha kamayish: birinchisi yutadi
         existing = conn.execute(text("SELECT COUNT(*) FROM meters")).scalar() or 0
 
+    raw, rd = open_csv(path)
     total = 0
     unmatched = 0
     raw_conn = engine.raw_connection()
     try:
         cur = raw_conn.cursor()
-        for part in parts:
-            raw, rd = open_csv(part)
-            with raw:
-                try:
-                    header = next(rd)
-                except StopIteration:
-                    raise IngestError(f"{os.path.basename(part)}: fayl bo'sh")
-                idx = resolve(header, DETAILS_COLS, "Details")
-                (i_esp, i_tp, i_acc, i_no, i_mt, i_link, i_ct, _, _, i_lat, i_lon, i_st, i_name,
-                 i_addr, i_lp, i_days, b1, b2, b3, b4, b5, i_dir) = idx
-                buf = []
-                for r in rd:
-                    if len(r) <= max(idx):
-                        continue
-                    no = r[i_no].strip()
-                    if not no:
-                        continue
-                    en = r[i_esp].strip()
-                    eid = esps.get(en)
-                    if eid is None:
-                        cur.execute("INSERT INTO esps (name, code, label, sort) VALUES (%s,'',%s,%s)",
-                                    (en, esp_label(en), esp_sort(en)))
-                        eid = esps[en] = cur.lastrowid
-                    tp = r[i_tp].strip()[:80]
-                    tr_id, brig = trmap.get((eid, tp), (None, None))
-                    if tr_id is None:
-                        unmatched += 1
-                    bucket = (1 if r[b1] == "1" else 2 if r[b2] == "1" else 3 if r[b3] == "1"
-                              else 4 if r[b4] == "1" else 5 if r[b5] == "1" else 0)
-                    lp = r[i_lp].strip()
-                    buf.append((
-                        no, eid, tp, tr_id, brig, r[i_acc].strip()[:24], r[i_mt].strip()[:24],
-                        r[i_link].strip()[:8], _num(r[i_ct], int) or 0, _num(r[i_st], int) or 0,
-                        r[i_name].strip()[:200], r[i_addr].strip()[:250], _num(r[i_lat]), _num(r[i_lon]),
-                        lp if len(lp) >= 10 else None, _num(r[i_days], int), bucket,
-                        1 if r[i_dir].strip() == "1" else 0, batch))
-                    total += 1
-                    if len(buf) >= 4000:
-                        cur.executemany(_METER_SQL, buf)
-                        raw_conn.commit()
-                        buf = []
-                        progress(min(0.99, (done_bytes + raw.tell()) / size), f"Hisoblagichlar: {total:,}".replace(",", " "))
-                if buf:
+        with raw:
+            idx = resolve(next(rd), DETAILS_COLS, "Details")
+            (i_esp, i_tp, i_acc, i_no, i_mt, i_link, i_ct, _, _, i_lat, i_lon, i_st, i_name,
+             i_addr, i_lp, i_days, b1, b2, b3, b4, b5, i_dir) = idx
+            buf = []
+            last_t = 0
+            for r in rd:
+                if len(r) <= max(idx):
+                    continue
+                no = r[i_no].strip()
+                if not no:
+                    continue
+                en = r[i_esp].strip()
+                eid = esps.get(en)
+                if eid is None:
+                    cur.execute("INSERT INTO esps (name, code, label, sort) VALUES (%s,'',%s,%s)",
+                                (en, esp_label(en), esp_sort(en)))
+                    eid = esps[en] = cur.lastrowid
+                tp = r[i_tp].strip()[:80]
+                tr_id, brig = trmap.get((eid, tp), (None, None))
+                if tr_id is None:
+                    unmatched += 1
+                bucket = (1 if r[b1] == "1" else 2 if r[b2] == "1" else 3 if r[b3] == "1"
+                          else 4 if r[b4] == "1" else 5 if r[b5] == "1" else 0)
+                lp = r[i_lp].strip()
+                buf.append((
+                    no, eid, tp, tr_id, brig, r[i_acc].strip()[:24], r[i_mt].strip()[:24],
+                    r[i_link].strip()[:8], _num(r[i_ct], int) or 0, _num(r[i_st], int) or 0,
+                    r[i_name].strip()[:200], r[i_addr].strip()[:250], _num(r[i_lat]), _num(r[i_lon]),
+                    lp if len(lp) >= 10 else None, _num(r[i_days], int), bucket,
+                    1 if r[i_dir].strip() == "1" else 0, batch))
+                total += 1
+                if len(buf) >= 4000:
                     cur.executemany(_METER_SQL, buf)
                     raw_conn.commit()
-            done_bytes += os.path.getsize(part)
+                    buf = []
+                    progress(min(0.99, raw.tell() / size), f"Hisoblagichlar: {total:,}".replace(",", " "))
+            if buf:
+                cur.executemany(_METER_SQL, buf)
+                raw_conn.commit()
         if total == 0:
             raise IngestError("Details faylida ma'lumot topilmadi")
-        if expected is not None and total != expected:
-            raise IngestError(f"Details bo'laklaridagi qatorlar soni manifestga mos emas: {total} ta o'qildi, "
-                              f"manifestda {expected} ta. Eski ma'lumot o'chirilmadi.")
         if existing > 10000 and total < existing * 0.5:
             raise IngestError(f"Details fayli to'liq emas ko'rinadi: {total} ta hisoblagich "
                               f"(bazada {existing} ta bor). Eskilari o'chirilmadi.")

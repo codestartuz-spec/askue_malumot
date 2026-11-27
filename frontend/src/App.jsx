@@ -9,6 +9,7 @@ import { Spinner } from './ui'
 const Dynamics = lazy(() => import('./pages/Dynamics'))
 const MapPage = lazy(() => import('./pages/MapPage'))
 const Republic = lazy(() => import('./pages/Republic'))
+const Nation = lazy(() => import('./pages/Nation'))
 const Ag = lazy(() => import('./pages/Ag'))
 const Home = lazy(() => import('./pages/Home'))
 const Messages = lazy(() => import('./pages/Messages'))
@@ -42,11 +43,12 @@ export default function App() {
           <Route path="/obxod" element={<Navigate to="/dinamika?t=obxod" replace />} />
           <Route path="/kunlik-topshiriq" element={<Guard perm="daily.view"><Daily /></Guard>} />
           <Route path="/xarita" element={<Guard perm="map.view"><MapPage /></Guard>} />
+          <Route path="/respublika-dinamikasi" element={<Guard perm="nation.view"><Nation /></Guard>} />
           <Route path="/respublika" element={<Guard perm="republic.view"><Republic /></Guard>} />
           <Route path="/ag" element={<Guard perm="ag.view"><Ag /></Guard>} />
           <Route path="/sozlamalar" element={<Guard any={['settings.manage', 'system.view', 'backup.manage']}><Settings /></Guard>} />
           <Route path="/brigadalar" element={<Guard perm="brigade.view"><Brigades /></Guard>} />
-          <Route path="/yuklash" element={<Guard any={['data.upload', 'republic.upload', 'ag.upload']}><Upload /></Guard>} />
+          <Route path="/yuklash" element={<Guard any={['data.upload', 'republic.upload', 'nation.upload', 'ag.upload']}><Upload /></Guard>} />
           <Route path="/xodimlar" element={<Guard sadmin><Users /></Guard>} />
           <Route path="/qurilmalar" element={<Guard sadmin><Devices /></Guard>} />
           <Route path="/jurnal" element={<Guard perm="audit.view"><Audit /></Guard>} />

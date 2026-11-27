@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import text
 
 from ..db import engine, upsert_kv
-from . import chunked, geo, snapshots
+from . import geo, snapshots
 from .ingest import IngestError, ingest_area, ingest_details, remap_meters
 
 
@@ -92,5 +92,8 @@ def run_job(job_id: int) -> None:
                       {"m": msg[:1500], "t": datetime.now(), "i": job_id})
     finally:
         for p in (job["area_path"], job["details_path"]):
-            chunked.remove_path(p)
-        chunked.remove_session(job_id)
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass

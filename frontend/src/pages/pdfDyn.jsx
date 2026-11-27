@@ -1,7 +1,7 @@
 // Respublika va AG dinamikasi uchun umumiy qismlar: holat (hook), filtrlar paneli, bo'sh holat xabarlari.
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe2, GitCompareArrows, CalendarRange, FileText, FileSpreadsheet, FileDown, Send, RefreshCw, UploadCloud } from 'lucide-react'
+import { Globe2, GitCompareArrows, CalendarRange, FileText, FileSpreadsheet, FileDown, Image as ImageIcon, Send, RefreshCw, UploadCloud } from 'lucide-react'
 import { api, download, qs } from '../api'
 import { useAuth } from '../auth'
 import { Empty, useToast } from '../ui'
@@ -25,13 +25,13 @@ export function usePdfDyn(base, fileLabel) {
   const pick = (m) => { if (m !== mode) { setA(''); setMode(m) } }
   const dl = async (fmt) => {
     setBusy(fmt)
-    try { await download(`${base}/download${qs({ fmt, a, b, mode })}`, `${fileLabel}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`) } catch (e) { toast(e.message, 'err') } finally { setBusy('') }
+    try { await download(`${base}/download${qs({ fmt, a, b, mode })}`, `${fileLabel}.${fmt === 'xlsx' ? 'xlsx' : fmt === 'png' ? 'zip' : 'pdf'}`) } catch (e) { toast(e.message, 'err') } finally { setBusy('') }
   }
   return { a, setA, b, setB, data, err, send, setSend, busy, mode, load, pick, dl, dates: data?.dates || [] }
 }
 
 /** Hudud nomi, rejim, sana tanlash, yuklab olish va Telegram tugmalari. */
-export function PdfFilters({ st, region, perm, firstLabel, origHint }) {
+export function PdfFilters({ st, region, perm, firstLabel, origHint, images = false }) {
   const { can } = useAuth()
   const { data, mode, dates, busy } = st
   return (
@@ -54,6 +54,7 @@ export function PdfFilters({ st, region, perm, firstLabel, origHint }) {
       {can('report.download') && data && (<>
         <button className="btn ghost" disabled={!!busy} onClick={() => st.dl('pdf')}><FileText size={16} />PDF</button>
         <button className="btn ghost" disabled={!!busy} onClick={() => st.dl('xlsx')}><FileSpreadsheet size={16} />Excel</button>
+        {images && <button className="btn ghost" disabled={!!busy} title="Barcha jadvallar rasm (PNG) ko'rinishida, ZIP arxivda" onClick={() => st.dl('png')}><ImageIcon size={16} />Rasmlar</button>}
         <button className="btn ghost" hidden={!can(`${perm}.original`)} disabled={!!busy} title={origHint} onClick={() => st.dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
       {can('telegram.send') && data && <button className="btn primary" onClick={() => st.setSend(true)}><Send size={16} />Telegramga yuborish</button>}
     </div>
