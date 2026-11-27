@@ -1,7 +1,7 @@
 // Respublika va AG dinamikasi uchun umumiy qismlar: holat (hook), filtrlar paneli, bo'sh holat xabarlari.
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe2, GitCompareArrows, CalendarRange, FileText, FileSpreadsheet, FileDown, Image as ImageIcon, Send, RefreshCw, UploadCloud } from 'lucide-react'
+import { Globe2, GitCompareArrows, CalendarRange, FileText, FileSpreadsheet, FileDown, Image as ImageIcon, Download, ChevronDown, Send, RefreshCw, UploadCloud } from 'lucide-react'
 import { api, download, qs } from '../api'
 import { useAuth } from '../auth'
 import { Empty, useToast } from '../ui'
@@ -31,9 +31,11 @@ export function usePdfDyn(base, fileLabel) {
 }
 
 /** Hudud nomi, rejim, sana tanlash, yuklab olish va Telegram tugmalari. */
-export function PdfFilters({ st, region, perm, firstLabel, origHint, images = false }) {
+export function PdfFilters({ st, region, perm, firstLabel, origHint, images = false, menuTitle = '' }) {
   const { can } = useAuth()
   const { data, mode, dates, busy } = st
+  const [open, setOpen] = useState(false)
+  const pickDl = (f) => { setOpen(false); st.dl(f) }
   return (
     <div className="filters">
       <label className="filter"><span><Globe2 size={15} />Hudud nomi:</span><b className="static-box">{region}</b></label>
@@ -51,11 +53,19 @@ export function PdfFilters({ st, region, perm, firstLabel, origHint, images = fa
         <select value={data?.b || ''} onChange={(e) => { st.setB(e.target.value); st.setA('') }}>{dates.map((d) => <option key={d} value={d}>{dmy(d)}</option>)}</select>
         <button className="icon-btn" title="Yangilash" onClick={st.load}><RefreshCw size={16} /></button></label>)}
       <div className="spacer" />
-      {can('report.download') && data && (<>
-        <button className="btn ghost" disabled={!!busy} onClick={() => st.dl('pdf')}><FileText size={16} />PDF</button>
-        <button className="btn ghost" disabled={!!busy} onClick={() => st.dl('xlsx')}><FileSpreadsheet size={16} />Excel</button>
-        {images && <button className="btn ghost" disabled={!!busy} title="Barcha jadvallar rasm (PNG) ko'rinishida, ZIP arxivda" onClick={() => st.dl('png')}><ImageIcon size={16} />Rasmlar</button>}
-        <button className="btn ghost" hidden={!can(`${perm}.original`)} disabled={!!busy} title={origHint} onClick={() => st.dl('orig')}><FileDown size={16} />Asl PDF</button></>)}
+      {can('report.download') && data && (
+        <div className="dl">
+          <button className="btn ghost" disabled={!!busy} onClick={() => setOpen(!open)}>
+            <Download size={16} />{busy ? 'Tayyorlanmoqda…' : 'Yuklab olish'}<ChevronDown size={15} /></button>
+          {open && (
+            <div className="dl-menu" onMouseLeave={() => setOpen(false)}>
+              <small>{menuTitle || `${region} — ${dmy(data.b)} holatiga`}</small>
+              <button onClick={() => pickDl('xlsx')}><FileSpreadsheet size={17} />Excel (.xlsx)</button>
+              <button onClick={() => pickDl('pdf')}><FileText size={17} />PDF</button>
+              {images && <button onClick={() => pickDl('png')}><ImageIcon size={17} />Jadval rasmlari (ZIP)</button>}
+              {can(`${perm}.original`) && <button title={origHint} onClick={() => pickDl('orig')}><FileDown size={17} />Asl PDF</button>}
+            </div>)}
+        </div>)}
       {can('telegram.send') && data && <button className="btn primary" onClick={() => st.setSend(true)}><Send size={16} />Telegramga yuborish</button>}
     </div>
   )
