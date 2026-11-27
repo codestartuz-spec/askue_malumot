@@ -120,7 +120,7 @@ def looks_like(data: bytes) -> bool:
     """PDF respublika (R-Dynamic) hisobotimi: jadvalda barcha viloyatlar (Qoraqalpoq …) bor."""
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
-            txt = " ".join((pg.extract_text() or "") for pg in pdf.pages[:2])
+            txt = " ".join(w["text"] for w in pdf.pages[0].extract_words(x_tolerance=1.2))
     except Exception:  # noqa: BLE001
         return False
     return "Qoraqalpoq" in txt and "Farg" in txt and "Xorazm" in txt
@@ -131,9 +131,13 @@ def parse_pdf(data: bytes) -> dict:
     pages, start, end = [], None, None
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for pn, pg in enumerate(pdf.pages, 1):
+            if pn not in PAGE_MAP:                       # diagramma / SmartApp sahifalari o'qilmaydi (tezroq)
+                continue
             ws = pg.extract_words(x_tolerance=1.2)
             if not ws:
                 continue
+            if pn == 1 and not any(w["text"].startswith("Qoraqalpoq") for w in ws):
+                return {"start": None, "end": None, "pages": []}      # respublika PDF'i emas
             if not end:
                 txt = " ".join(w["text"] for w in sorted(ws, key=lambda w: (round(w["top"]), w["x0"])))
                 m = R.RANGE_RE.search(txt)
@@ -143,8 +147,6 @@ def parse_pdf(data: bytes) -> dict:
                     if not end:
                         d2 = R.DATE_RE.findall(txt)
                         end = R._d(".".join(d2[0])) if d2 else None
-            if pn not in PAGE_MAP:
-                continue
             got = _page_rows(ws)
             if not got:
                 continue

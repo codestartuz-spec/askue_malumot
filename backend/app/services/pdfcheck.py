@@ -96,7 +96,7 @@ def _main(kind: str) -> None:
             res = ag.parse_pdf(data)
         elif kind == "nation":
             from . import nation
-            res = nation.parse_report(data) if nation.looks_like(data) else {"start": None, "end": None, "pages": []}
+            res = nation.parse_report(data)
         else:
             from . import ag, nation, republic
             if ag.looks_like_ag(data):
