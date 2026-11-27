@@ -195,3 +195,6 @@ Qashqadaryo bo'limi o'z tuman PDF'lari bilan o'zgarishsiz qoladi.
 - **Ruxsatlar** (alohida): `nation.view`, `nation.upload`, `nation.original`. Qashqadaryo ruxsatlari (`republic.*`) bor xodimlarga bir marta avtomatik beriladi; tayyor to'plamlarga ham qo'shildi.
 - Yangi jadval `nation_reports` (migratsiya 0004), fayl nomlari Sozlamalarda (`fn_nation`, `fn_nation_png`, `fn_nation_orig`). Qashqadaryo fayllari endi `Qashqadaryo_dinamikasi_{sana}` deb nomlanadi.
 - Yangi bog'liqlik: `pypdfium2` (PDF sahifani rasmga aylantirish).
+
+### v14c — PDF yuklash: ikki bosqichli jarayon (Qashqadaryo / Respublika / AG)
+1. **Serverga yuklash** (progress 0–100%), 2. **PDF o'qish va bazaga yozish** orqa fonda (worker). «Yuklangan sanalar» jadvalida holat ko'rinadi: *Yuklanmoqda → Navbatda → PDF o'qilmoqda → Yuklandi* (xato bo'lsa sababi bilan, ✕ bilan yopiladi). Sahifani yopsa ham jarayon davom etadi. API: `POST /{bo'lim}/upload/start`, `GET /{bo'lim}/jobs` (eski sinxron `POST /upload` ham saqlangan). Jadval `pdf_jobs` (migratsiya 0005).

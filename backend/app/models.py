@@ -297,6 +297,25 @@ class RepublicReport(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
+class PdfJob(Base):
+    """PDF hisobot yuklash vazifasi (Qashqadaryo / Respublika / AG): fayl serverga olinadi, o'qish orqa fonda bajariladi."""
+    __tablename__ = "pdf_jobs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    status: Mapped[str] = mapped_column(String(12), default="queued")     # queued | running | done | error
+    progress: Mapped[float] = mapped_column(Float, default=0)
+    stage: Mapped[str] = mapped_column(String(200), default="Navbatda")
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filename: Mapped[str] = mapped_column(String(200), default="")
+    path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    pages: Mapped[int] = mapped_column(Integer, default=0)
+    replaced: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class NationReport(Base):
     """Respublika dinamikasi (barcha viloyatlar): har bir yuklangan R-Dynamic PDF — «Жами» va 14 viloyat qatori."""
     __tablename__ = "nation_reports"

@@ -107,3 +107,30 @@ def test_send_pdf_excel_and_image_album(client, make_user, fake_tg):
     sent = [s[1] for s in fake_tg if s[0] == "-100999"]
     assert any(n.startswith("ALBUM:") and n.count("+") == 6 for n in sent), sent
     assert "Respublika_dinamikasi_2026-11-27.pdf" in sent and "Respublika_dinamikasi_2026-11-27.xlsx" in sent
+
+
+def test_async_upload_job_flow(client, make_user):
+    """Ikki bosqichli yuklash: fayl serverga olinadi (job), PDF o'qish orqa fonda; xato ham job'da ko'rinadi."""
+    _, h = make_user(["nation.upload", "nation.view", "data.delete"])
+    r = client.post("/api/nation/upload/start", files=_files(N25), headers=h)
+    assert r.status_code == 200, r.text
+    jid = r.json()["id"]
+    assert r.json()["status"] in ("queued", "running", "done")
+    for _ in range(200):
+        items = client.get("/api/nation/jobs", headers=h).json()["items"]
+        j = next(x for x in items if x["id"] == jid)
+        if j["status"] in ("done", "error"):
+            break
+        time.sleep(0.25)
+    assert j["status"] == "done" and j["end"] == "2026-11-25" and j["pages"] == 7 and j["progress"] == 100
+    assert any(x["end"] == "2026-11-25" for x in client.get("/api/nation", headers=h).json())
+    bad = client.post("/api/nation/upload/start", files=_files(FIX / "republic_2026-11-23.pdf"), headers=h).json()["id"]
+    for _ in range(200):
+        j2 = next(x for x in client.get("/api/nation/jobs", headers=h).json()["items"] if x["id"] == bad)
+        if j2["status"] in ("done", "error"):
+            break
+        time.sleep(0.25)
+    assert j2["status"] == "error" and "respublika" in j2["message"].lower()
+    assert client.delete(f"/api/nation/jobs/{bad}", headers=h).status_code == 200
+    _, none = make_user(["nation.view"])
+    assert client.post("/api/nation/upload/start", files=_files(N25), headers=none).status_code == 403

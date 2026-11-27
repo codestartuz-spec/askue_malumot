@@ -82,43 +82,91 @@ const PDF_KINDS = {
 function PdfUpload({ kind }) {
   const K = PDF_KINDS[kind]
   const toast = useToast()
-  const [file, setFile] = useState(null)
-  const [pct, setPct] = useState(null)
-  const [list, setList] = useState(null)
-  const load = () => api.get(K.base).then(setList).catch(() => setList([]))
-  useEffect(() => { load() }, [])
-  const go = async () => {
-    const f = new FormData(); f.append('file', file); setPct(0)
-    try {
-      const r = await uploadForm(`${K.base}/upload`, f, setPct)
-      toast(`Qabul qilindi: ${dmy(r.end)} (${r.pages} ta ${K.unit})${r.replaced ? ' — oldingisi yangilandi' : ''}`)
-      setFile(null); load()
-    } catch (e) { toast(e.message, 'err') } finally { setPct(null) }
-  }
   const { can } = useAuth()
+  const [file, setFile] = useState(null)
+  const [sending, setSending] = useState(null)      // 1-bosqich: serverga yuklash, 0..1
+  const [list, setList] = useState(null)
+  const [jobs, setJobs] = useState([])
+  const [alive, setAlive] = useState(true)
   const [ask, setAsk] = useState(null)
+  const seen = useRef(new Set())
+  const first = useRef(true)
+  const load = useCallback(() => api.get(K.base).then(setList).catch(() => setList([])), [K.base])
+  const poll = useCallback(async () => {
+    try {
+      const r = await api.get(`${K.base}/jobs`)
+      setJobs(r.items); setAlive(r.worker_alive)
+      let fresh = false
+      r.items.forEach((j) => {
+        if (j.status === 'done' && !seen.current.has(j.id)) {
+          if (!first.current) { fresh = true; toast(`Yuklandi: ${dmy(j.end)} (${j.pages} ta ${K.unit})${j.replaced ? ' — oldingisi yangilandi' : ''}`) }
+          seen.current.add(j.id)
+        }
+      })
+      first.current = false
+      if (fresh) load()
+    } catch { /* */ }
+  }, [K.base, K.unit, load, toast])
+  useEffect(() => { load() }, [load])
+  const active = jobs.some((j) => j.status === 'queued' || j.status === 'running')
+  useEffect(() => {
+    poll()
+    const id = setInterval(poll, active ? 1200 : 6000)
+    return () => clearInterval(id)
+  }, [poll, active])
+  const go = async () => {
+    const f = new FormData(); f.append('file', file); setSending(0)
+    try {
+      await uploadForm(`${K.base}/upload/start`, f, setSending)
+      toast("Fayl serverga yuklandi. PDF'ni o'qish orqa fonda davom etadi — sahifani yopsangiz ham bo'ladi")
+      setFile(null); poll()
+    } catch (e) { toast(e.message, 'err') } finally { setSending(null) }
+  }
   const del = async () => { const r = ask; setAsk(null); try { await api.del(`${K.base}/${r.id}`); toast(`${dmy(r.end)} o'chirildi`); load() } catch (e) { toast(e.message, 'err') } }
+  const dismiss = (j) => api.del(`${K.base}/jobs/${j.id}`).then(poll).catch((e) => toast(e.message, 'err'))
   const view = (r) => openFile(`${K.base}/${r.id}/file?inline=1`).catch((e) => toast(e.message, 'err'))
   const dl = (r) => download(`${K.base}/${r.id}/file`, r.filename).catch((e) => toast(e.message, 'err'))
+  const pending = jobs.filter((j) => j.status !== 'done')
+  const empty = (!list || list.length === 0) && pending.length === 0 && sending === null
   return (<>
+    {!alive && active && <div className="alert"><Server size={18} />Worker (orqa fon jarayoni) ishlamayapti — PDF o'qilmay navbatda turib qoladi. Serverda worker'ni ishga tushiring.</div>}
     <div className="card pad">
       <div className="drops one"><Drop icon={K.icon} label={`${K.label} (PDF)`} hint={K.hint} accept=".pdf" file={file} onFile={setFile} /></div>
       <div className="upl-row">
         <small className="hint">{K.info}</small>
         <div className="spacer" />
-        <button className="btn primary big" disabled={!file || pct !== null} onClick={go}><Rocket size={18} />{pct !== null ? `Yuborilmoqda ${Math.round(pct * 100)}%` : 'Yuklash'}</button>
+        <button className="btn primary big" disabled={!file || sending !== null} onClick={go}>
+          <Rocket size={18} />{sending !== null ? `Serverga yuklanmoqda ${Math.round(sending * 100)}%` : 'Yuklashni boshlash'}</button>
       </div>
-      {pct !== null && <div className="progress"><div className="bar" style={{ width: `${pct * 100}%` }} /></div>}
+      {sending !== null && <div className="progress"><div className="bar" style={{ width: `${sending * 100}%` }} /></div>}
     </div>
     <h3 className="sec-title">Yuklangan sanalar</h3>
-    {!list ? null : list.length === 0 ? <div className="card pad mut">Hali {K.noun} PDF'i yuklanmagan.</div> : (
-      <div className="card tcard"><div className="tbl-scroll"><table className="list"><thead><tr><th>Sana</th><th>Davr</th><th>Fayl</th><th>{K.col}</th><th>Yuklagan</th><th /></tr></thead>
-        <tbody>{list.map((r) => (<tr key={r.id}><td className="b">{dmy(r.end)}</td><td className="nowrap-d">{dmy(r.start)} – {dmy(r.end)}</td><td className="mut"><FileText size={14} /> {r.filename}</td><td>{r.pages}</td><td className="mut">{r.by} • {dt(r.at)}</td>
-          <td className="acts">
-          {can(K.perm) && r.has_file && <><button className="btn ghost sm" title="PDF'ni brauzerda ochish" onClick={() => view(r)}><Eye size={15} />Ko'rish</button>
-            <button className="btn ghost sm" title="PDF'ni yuklab olish" onClick={() => dl(r)}><Download size={15} />Yuklab olish</button></>}
-          {can(K.perm) && !r.has_file && <small className="mut">Fayl serverda yo'q</small>}
-          {can('data.delete') && <button className="icon-btn danger" title="O'chirish" onClick={() => setAsk(r)}><Trash2 size={16} /></button>}</td></tr>))}</tbody></table></div></div>)}
+    {empty ? <div className="card pad mut">Hali {K.noun} PDF'i yuklanmagan.</div> : (
+      <div className="card tcard"><div className="tbl-scroll"><table className="list jobs-table"><thead><tr><th>Holat</th><th>Sana</th><th>Davr</th><th>Fayl</th><th>{K.col}</th><th>Yuklagan</th><th /></tr></thead>
+        <tbody>
+          {sending !== null && <tr className="job-row running"><td><span className="tag blue"><Loader2 size={14} className="spin" />Yuklanmoqda</span></td><td className="mut">—</td><td className="mut">—</td>
+            <td className="job-files-c mut"><div>{file?.name}</div><div className="progress st-running"><div className="bar" style={{ width: `${Math.max(sending * 100, 3)}%` }} /><span>{Math.round(sending * 100)}%</span></div><div className="stage">1/2 — fayl serverga yuklanmoqda</div></td>
+            <td className="mut">—</td><td className="mut">—</td><td /></tr>}
+          {pending.map((j) => {
+            const S = STATUS[j.status]
+            const run = j.status === 'queued' || j.status === 'running'
+            return (<tr key={`j${j.id}`} className={`job-row ${j.status}`}>
+              <td><span className={`tag ${S.c}`}><S.i size={14} className={j.status === 'running' ? 'spin' : ''} />{j.status === 'running' ? "PDF o'qilmoqda" : S.t}</span></td>
+              <td className="mut">—</td><td className="mut">—</td>
+              <td className="job-files-c mut"><div><FileText size={14} /> {j.filename}</div>
+                {run && <><div className={`progress st-${j.status}`}><div className="bar" style={{ width: `${Math.max(j.progress, 4)}%` }} /><span>{j.status === 'queued' ? 'Navbat kutilmoqda' : `${Math.round(j.progress)}%`}</span></div><div className="stage">2/2 — {j.stage}</div></>}
+                {j.status === 'error' && <div className="job-err"><AlertTriangle size={15} />{j.message}</div>}</td>
+              <td className="mut">—</td><td className="mut nowrap-d">{dt(j.at)}<div>{j.by}</div></td>
+              <td className="acts">{j.status === 'error' && <button className="icon-btn" title="Yopish" onClick={() => dismiss(j)}><X size={16} /></button>}</td></tr>)
+          })}
+          {(list || []).map((r) => (<tr key={r.id} className="job-row done"><td><span className="tag green"><CheckCircle2 size={14} />Yuklandi</span></td>
+            <td className="b">{dmy(r.end)}</td><td className="nowrap-d">{dmy(r.start)} – {dmy(r.end)}</td><td className="mut"><FileText size={14} /> {r.filename}</td><td>{r.pages}</td><td className="mut">{r.by} • {dt(r.at)}</td>
+            <td className="acts">
+              {can(K.perm) && r.has_file && <><button className="btn ghost sm" title="PDF'ni brauzerda ochish" onClick={() => view(r)}><Eye size={15} />Ko'rish</button>
+                <button className="btn ghost sm" title="PDF'ni yuklab olish" onClick={() => dl(r)}><Download size={15} />Yuklab olish</button></>}
+              {can(K.perm) && !r.has_file && <small className="mut">Fayl serverda yo'q</small>}
+              {can('data.delete') && <button className="icon-btn danger" title="O'chirish" onClick={() => setAsk(r)}><Trash2 size={16} /></button>}</td></tr>))}
+        </tbody></table></div></div>)}
     {ask && <Confirm icon={Trash2} danger title={`${K.label} ma'lumotini o'chirish`} ok="Ha, o'chirish" onOk={del} onCancel={() => setAsk(null)}>
       <b>{dmy(ask.end)}</b> sanadagi {K.label.toLowerCase()} ({ask.filename}) o'chiriladi: jadval ma'lumoti va serverdagi PDF fayl. Qaytarib bo'lmaydi.
       <small className="hint">Kunlik solishtirish endi oldingi sanalar bilan hisoblanadi.</small></Confirm>}

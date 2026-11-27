@@ -4,7 +4,7 @@ Har bir tur `Kind` bilan tavsiflanadi (modeli, parseri, taqqoslash va chiqarish 
 yuklash / ro'yxat / o'chirish / asl PDF / solishtirish / yuklab olish / Telegramga yuborishni o'zi yasaydi."""
 import time
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Callable
 from urllib.parse import quote
 
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..db import SessionLocal, engine, get_db
 from ..deps import has_perm, log, need, need_any
-from ..models import User
+from ..models import PdfJob, User
 from ..services import pdfcheck, sendjobs
 from ..services import posts as P
 from ..services import telegram as tg
@@ -120,29 +120,73 @@ def _guard_orig(kind: Kind, user: User, fmts) -> None:
         raise HTTPException(403, "Asl PDF uchun ruxsat yo'q")
 
 
+def ingest(kind: Kind, db: Session, rep: Parsed, data: bytes, filename: str, username: str) -> bool:
+    """O'qilgan PDF'ni bazaga va diskka yozadi (shu sana bo'lsa — yangilaydi). Qaytaradi: oldingisi almashtirildimi."""
+    row = db.scalar(select(kind.model).where(kind.model.end_date == rep.end))
+    replaced = bool(row)
+    if row:
+        row.data, row.start_date, row.filename = rep.payload, rep.start, filename
+        row.uploaded_by, row.uploaded_at = username, datetime.now()
+    else:
+        db.add(kind.model(end_date=rep.end, start_date=rep.start, filename=filename, data=rep.payload, uploaded_by=username))
+    kind.folder.mkdir(exist_ok=True)
+    kind.file(rep.end).write_bytes(data)
+    log(db, username, kind.audit[0], f"{filename} → {rep.end.isoformat()}")
+    db.commit()
+    return replaced
+
+
+def job_out(j: PdfJob) -> dict:
+    return {"id": j.id, "status": j.status, "progress": j.progress, "stage": j.stage, "message": j.message,
+            "filename": j.filename, "end": j.end_date.isoformat() if j.end_date else None, "pages": j.pages,
+            "replaced": j.replaced, "by": j.created_by, "at": j.created_at.isoformat()}
+
+
 def make_router(kind: Kind) -> APIRouter:
     k = kind.key
     r = APIRouter(prefix=f"/{k}", tags=[k])
 
     @r.post("/upload")
     def upload(file: UploadFile = File(...), user: User = Depends(need(f"{k}.upload")), db: Session = Depends(get_db)):
+        """To'g'ridan-to'g'ri (kutib turib) yuklash: o'qib bo'lgach natijani qaytaradi."""
         data = pdfcheck.read_upload(file)
         rep = kind.parse(pdfcheck.parse_isolated(k, data), file.filename or "")
-        row = db.scalar(select(kind.model).where(kind.model.end_date == rep.end))
-        replaced = bool(row)
-        from datetime import datetime
-        if row:
-            row.data, row.start_date, row.filename = rep.payload, rep.start, file.filename or ""
-            row.uploaded_by, row.uploaded_at = user.username, datetime.now()
-        else:
-            db.add(kind.model(end_date=rep.end, start_date=rep.start, filename=file.filename or "",
-                              data=rep.payload, uploaded_by=user.username))
-        kind.folder.mkdir(exist_ok=True)
-        kind.file(rep.end).write_bytes(data)
-        log(db, user.username, kind.audit[0], f"{file.filename} → {rep.end.isoformat()}")
-        db.commit()
+        replaced = ingest(kind, db, rep, data, file.filename or "", user.username)
         return {"end": rep.end.isoformat(), "start": rep.start.isoformat() if rep.start else None,
                 "pages": rep.count, "replaced": replaced}
+
+    @r.post("/upload/start")
+    def upload_start(file: UploadFile = File(...), user: User = Depends(need(f"{k}.upload")), db: Session = Depends(get_db)):
+        """1-bosqich: fayl serverga olinadi va vazifa yaratiladi (tez). 2-bosqich (PDF'ni o'qish) orqa fonda."""
+        data = pdfcheck.read_upload(file)
+        pend = kind.folder / "_pending"
+        pend.mkdir(parents=True, exist_ok=True)
+        path = pend / f"{int(time.time() * 1000)}.pdf"
+        path.write_bytes(data)
+        job = PdfJob(kind=k, filename=(file.filename or "")[:200], path=str(path), created_by=user.username,
+                     stage="Fayl serverga yuklandi, navbat kutilmoqda", progress=5)
+        db.add(job)
+        db.commit()
+        submit("pdfreport.ingest", k, job.id)
+        return job_out(job)
+
+    @r.get("/jobs")
+    def jobs(_: User = Depends(need_any(f"{k}.upload")), db: Session = Depends(get_db)):
+        rows = db.scalars(select(PdfJob).where(PdfJob.kind == k).order_by(PdfJob.id.desc()).limit(12)).all()
+        hb = db.execute(text("SELECT v FROM kv WHERE k='worker_heartbeat'")).scalar()
+        return {"items": [job_out(j) for j in rows], "worker_alive": bool(hb and time.time() - int(hb) < 20)}
+
+    @r.delete("/jobs/{jid}")
+    def job_delete(jid: int, _: User = Depends(need(f"{k}.upload")), db: Session = Depends(get_db)):
+        """Xato bilan tugagan yoki tayyor yozuvni ro'yxatdan olib tashlaydi (sana ma'lumotiga tegmaydi)."""
+        j = db.get(PdfJob, jid)
+        if not j or j.kind != k:
+            raise HTTPException(404, "Topilmadi")
+        if j.status in ("queued", "running"):
+            raise HTTPException(400, "Jarayon tugamaguncha o'chirib bo'lmaydi")
+        db.delete(j)
+        db.commit()
+        return {"ok": True}
 
     @r.get("")
     def listing(_: User = Depends(need_any(f"{k}.view", f"{k}.upload")), db: Session = Depends(get_db)):
@@ -257,6 +301,40 @@ def _send_images(kind, job_id, chats, a, b, mode, post_id, pitems, with_ack, cha
             chat_err[str(chat_id)] = str(e)
         flush()
         time.sleep(settings.send_delay_sec)
+
+
+@task("pdfreport.ingest")
+def run_ingest(kind_key: str, job_id: int) -> None:
+    """2-bosqich: serverga tushgan PDF'ni o'qiydi va bazaga yozadi (orqa fonda)."""
+    from pathlib import Path
+    kind = KINDS[kind_key]
+
+    def upd(db, j, **kw):
+        for a, v in kw.items():
+            setattr(j, a, v)
+        db.commit()
+
+    with SessionLocal() as db:
+        j = db.get(PdfJob, job_id)
+        if not j:
+            return
+        path = Path(j.path or "")
+        try:
+            upd(db, j, status="running", progress=15, stage="PDF o'qilmoqda (jadvallar va sanalar)…")
+            data = path.read_bytes()
+            rep = kind.parse(pdfcheck.parse_isolated(kind_key, data), j.filename)
+            upd(db, j, progress=85, stage="Ma'lumotlar bazaga yozilmoqda…")
+            replaced = ingest(kind, db, rep, data, j.filename, j.created_by)
+            upd(db, j, status="done", progress=100, stage="Yuklandi", end_date=rep.end, pages=rep.count,
+                replaced=replaced, finished_at=datetime.now())
+        except HTTPException as e:
+            db.rollback()
+            upd(db, j, status="error", stage="Xatolik", message=str(e.detail), finished_at=datetime.now())
+        except Exception as e:  # noqa: BLE001
+            db.rollback()
+            upd(db, j, status="error", stage="Xatolik", message=f"Kutilmagan xato: {str(e)[:200]}", finished_at=datetime.now())
+        finally:
+            path.unlink(missing_ok=True)
 
 
 @task("pdfreport.send")
