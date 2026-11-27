@@ -113,7 +113,7 @@ function JobTable({ jobs, onDelete }) {
 
 // Respublika va AG PDF'larini yuklash (ikkalasi bir xil jarayon)
 const PDF_KINDS = {
-  resp: { base: '/republic', icon: Globe2, label: 'Respublika dinamikasi', noun: 'respublika', unit: 'jadval', col: 'Jadvallar', perm: 'republic.original',
+  resp: { base: '/republic', icon: Globe2, label: 'Qashqadaryo dinamikasi', noun: 'respublika', unit: 'jadval', col: 'Jadvallar', perm: 'republic.original',
     hint: 'Qashqadaryo_HETK_dynamic-01.11.2026--20.11.2026.pdf — oy boshidan oxirgi sanagacha',
     info: "PDF ichidagi viloyat «Жами» qatori va sana avtomatik o'qiladi. Har bir sana uchun bitta fayl saqlanadi; shu sana qayta yuklansa — yangilanadi. Kunma-kun solishtirish uchun har kuni yangi PDF yuklang." },
   ag: { base: '/ag', icon: FileBarChart2, label: 'AG dinamikasi', noun: 'AG', unit: 'hudud', col: 'Hududlar', perm: 'ag.original',
@@ -172,7 +172,7 @@ export default function Upload() {
   const { can } = useAuth()
   const tabs = [
     can('data.upload') && { k: 'kunlik', icon: UploadCloud, label: "Kunlik ma'lumot (Area / Details)" },
-    can('republic.upload') && { k: 'resp', icon: Globe2, label: 'Respublika dinamikasi' },
+    can('republic.upload') && { k: 'resp', icon: Globe2, label: 'Qashqadaryo dinamikasi' },
     can('ag.upload') && { k: 'ag', icon: FileBarChart2, label: 'AG dinamikasi' },
   ].filter(Boolean)
   const want = sp.get('t') || 'kunlik'

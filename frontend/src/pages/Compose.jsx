@@ -170,7 +170,7 @@ export default function Compose({ chats }) {
         <label className={`ack-opt ${ack ? 'on' : ''}`}><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} disabled={busy} />
           <i><MailCheck size={18} /></i><span><b>«Tanishdim» tugmasi</b><small>Xabar tagida tugma chiqadi. Kim va qachon bosgani jurnalga yoziladi; har bir foydalanuvchi bir marta tasdiqlay oladi.</small></span></label>
         <div className="row-btns"><button className="btn primary" disabled={!ready} onClick={send}><Send size={16} />{busy ? 'Yuborilmoqda…' : `Yuborish (${sel.size})`}</button>
-          <span className="hint">Hisobot fayllarini «Kunlik dinamika» va «Respublika dinamikasi» sahifalaridagi «Telegramga yuborish» tugmasi orqali yuborasiz.</span></div>
+          <span className="hint">Hisobot fayllarini «Kunlik dinamika» va «Qashqadaryo dinamikasi» sahifalaridagi «Telegramga yuborish» tugmasi orqali yuborasiz.</span></div>
         {busy && !job && up < 1 && <div className="progress sm"><div className="bar" style={{ width: `${Math.round(up * 100)}%` }} /><span>Yuklanmoqda {Math.round(up * 100)}%</span></div>}
         {job && (
           <div className="send-prog">

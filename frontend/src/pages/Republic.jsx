@@ -8,7 +8,7 @@ import { dmy } from '../fmt'
 import { Cell } from './DynPage'
 import { PdfEmpty, PdfFilters, isBlocked, usePdfDyn } from './pdfDyn'
 
-export function SendModal({ a, b, mode, onClose, base = '/republic', title = "Respublika dinamikasini Telegram'ga yuborish", origHint = "Respublika yuborgan fayl, o'zgartirishsiz" }) {
+export function SendModal({ a, b, mode, onClose, base = '/republic', title = "Qashqadaryo dinamikasini Telegram'ga yuborish", origHint = "Respublika yuborgan fayl, o'zgartirishsiz" }) {
   const { can } = useAuth()
   const toast = useToast()
   const [chats, setChats] = useState(null)
@@ -83,7 +83,7 @@ export default function Republic() {
         </div>)}
       <div className="card head-card">
         <div className="titles">
-          <h2 className="ttl">{cur ? `${region} ${cur.title}` : 'Respublika dinamikasi'}</h2>
+          <h2 className="ttl">{cur ? `${region} ${cur.title}` : 'Qashqadaryo dinamikasi'}</h2>
           <div className="dinamika">{'DINAMIKA'.split('').join(' ')}</div>
         </div>
         <PdfFilters st={st} region={region} perm="republic" firstLabel="Oy boshidan" origHint="Respublika markazi yuborgan asl PDF fayl" />

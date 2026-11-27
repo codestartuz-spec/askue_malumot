@@ -11,7 +11,7 @@ const NAV = [
   { to: '/', icon: Home, label: 'Bosh sahifa', end: true },
   { group: "Ma'lumotlar" },
   { to: '/dinamika', icon: Table2, label: 'Kunlik dinamika', any: ['view.konsentrator', 'view.aloqa', 'view.obxod'] },
-  { to: '/respublika', icon: Globe2, label: 'Respublika dinamikasi', perm: 'republic.view' },
+  { to: '/respublika', icon: Globe2, label: 'Qashqadaryo dinamikasi', perm: 'republic.view' },
   { to: '/ag', icon: FileBarChart2, label: 'AG dinamikasi', perm: 'ag.view' },
   { to: '/kunlik-topshiriq', icon: ClipboardList, label: 'Kunlik topshiriq', perm: 'daily.view' },
   { to: '/xarita', icon: MapPinned, label: 'Xarita', perm: 'map.view' },

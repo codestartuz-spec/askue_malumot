@@ -35,7 +35,7 @@ export default function Backup() {
           </div>
           {!d.bot && <div className="alert"><AlertTriangle size={16} />Telegram bot ulanmagan — nusxa faqat serverda saqlanadi.</div>}
           {d.bot && !d.sadmin_chat && <div className="alert"><AlertTriangle size={16} />Sadminning Telegram chat ID si kiritilmagan. Profil (yoki Xodimlar) bo'limida chat ID ni kiriting — shunda har kuni nusxa o'sha chatga keladi.</div>}
-          <small className="hint"><Info size={13} /> Nusxaga: xodimlar va ruxsatlar, tumanlar, brigadalar va xodimlari, TP'larning brigadaga biriktirilishi, barcha kunlik dinamika (snapshot), respublika dinamikasi, Telegram sozlamalari va harakatlar jurnali kiradi. Hisoblagichlar ro'yxati — Area/Details fayllaridan qayta tiklanadi.</small>
+          <small className="hint"><Info size={13} /> Nusxaga: xodimlar va ruxsatlar, tumanlar, brigadalar va xodimlari, TP'larning brigadaga biriktirilishi, barcha kunlik dinamika (snapshot), Qashqadaryo dinamikasi, Telegram sozlamalari va harakatlar jurnali kiradi. Hisoblagichlar ro'yxati — Area/Details fayllaridan qayta tiklanadi.</small>
         </section>
         <section className="card pad set-card">
           <h3><Clock size={20} />Nusxalar tarixi</h3>

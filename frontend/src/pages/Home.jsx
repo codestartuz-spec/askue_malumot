@@ -111,7 +111,7 @@ function Daily() {
   )
 }
 
-// ----------------------------------------------------------------- Respublika dinamikasi
+// ----------------------------------------------------------------- Qashqadaryo dinamikasi
 const cellOf = (rep, n, i) => rep.pages.find((p) => p.n === n)?.cells[i]
 
 function Republic() {
@@ -122,7 +122,7 @@ function Republic() {
   if (err) return <div className="card pad"><Empty icon={Globe2}>{err}</Empty></div>
   if (!d) return <Spinner />
   const reps = d.reports
-  if (!reps.length) return <div className="card pad"><Empty icon={Globe2}>Respublika PDF'i hali yuklanmagan. «Ma'lumot yuklash» → «Respublika dinamikasi» bo'limidan yuklang.</Empty></div>
+  if (!reps.length) return <div className="card pad"><Empty icon={Globe2}>Respublika PDF'i hali yuklanmagan. «Ma'lumot yuklash» → «Qashqadaryo dinamikasi» bo'limidan yuklang.</Empty></div>
   const last = reps[reps.length - 1]
   const prev = reps.length > 1 ? reps[reps.length - 2] : null
   const kun = mode === 'kunlik' && !!prev
@@ -154,7 +154,7 @@ function Republic() {
   const p2pct = val(2, 2)?.p
   return (
     <>
-      <div className="home-bar"><CalendarDays size={16} />Respublika dinamikasi: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><div className="seg"><button className={mode === 'oy' ? 'on' : ''} onClick={() => setMode('oy')}>Oy boshidan</button><button className={mode === 'kunlik' ? 'on' : ''} onClick={() => setMode('kunlik')} title="Oxirgi ikki PDF farqi">Kunlik</button></div>
+      <div className="home-bar"><CalendarDays size={16} />Qashqadaryo dinamikasi: <b>{dmy(last.start)} – {dmy(last.end)}</b><span className="grow" /><div className="seg"><button className={mode === 'oy' ? 'on' : ''} onClick={() => setMode('oy')}>Oy boshidan</button><button className={mode === 'kunlik' ? 'on' : ''} onClick={() => setMode('kunlik')} title="Oxirgi ikki PDF farqi">Kunlik</button></div>
         <span className="mut">{reps.length} ta PDF • ↑↓ {kun ? `${dmy(prev.end)} ga nisbatan` : mode === 'kunlik' ? 'kunlik uchun 2-PDF kerak' : 'oy boshidan'}</span></div>
       <div className="kpis">
         {kp(Server, 'Dasturdagi TP / konsentratorlar', 1, 0, false, 'blue')}
@@ -202,7 +202,7 @@ export default function Home() {
   const [sp, setSp] = useSearchParams()
   const tabs = [
     (can('view.konsentrator') || can('view.aloqa') || can('view.obxod')) && { k: 'kunlik', label: 'Kunlik dinamika', icon: Table2 },
-    can('republic.view') && { k: 'respublika', label: 'Respublika dinamikasi', icon: Globe2 },
+    can('republic.view') && { k: 'respublika', label: 'Qashqadaryo dinamikasi', icon: Globe2 },
   ].filter(Boolean)
   if (!tabs.length) return <div className="home-blank" />
   const tab = tabs.find((t) => t.k === sp.get('t'))?.k || tabs[0].k

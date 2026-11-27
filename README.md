@@ -110,7 +110,7 @@ frontend/  React: src/pages, src/tables.js (jadval tuzilmasi), dist/ (tayyor bui
 - Kunlik dinamika: aloqa jadvalidan «Aloqaga chiqqan» ustuni olib tashlandi, «Umuman aloqaga chiqmagan» uchun ↑↓ qo'shildi; PDF A4 varaqni to'liq to'ldiradi.
 - Manzil belgisi Google Maps yo'nalishini ochadi (hisoblagich va TP); qorong'u xarita kalitsiz OSM asosida.
 - Telegram: yuborish oralig'i va 429 (retry after) kutish yaxshilandi.
-- Respublika dinamikasi: «Ma'lumot yuklash → Respublika dinamikasi» orqali PDF yuklanadi; alohida sahifada kunma-kun solishtirish, PDF/Excel yuklash va Telegramga yuborish.
+- Qashqadaryo dinamikasi: «Ma'lumot yuklash → Qashqadaryo dinamikasi» orqali PDF yuklanadi; alohida sahifada kunma-kun solishtirish, PDF/Excel yuklash va Telegramga yuborish.
 - Sozlamalar: «Tizim va server holati» va «Zaxira nusxa» (har kuni 01:00, sadminga Telegram orqali; worker ishlashi shart). Tiklash: gunzip -c fayl.sql.gz | mysql -u root -p askue
 - Ruxsatlar qayta tuzildi (yangi: republic.view, system.view, backup.manage; bog'liq ruxsatlar avtomatik).
 - Yangi kutubxonalar: pdfplumber, psutil — setup.bat qayta ishga tushiring.

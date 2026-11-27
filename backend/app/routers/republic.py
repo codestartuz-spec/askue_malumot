@@ -46,7 +46,7 @@ def _orig(bd, start, saved):
 
 KIND = Kind(
     key="republic", model=RepublicReport, missing_msg="Hali respublika PDF'i yuklanmagan",
-    audit=("respublika_yuklash", "respublika_ochirish", "telegram_respublika"), post_title="Respublika dinamikasi",
+    audit=("respublika_yuklash", "respublika_ochirish", "telegram_respublika"), post_title="Qashqadaryo dinamikasi",
     parse=_parse, count=lambda d: len(d.get("pages", [])),
     default_start=lambda end: date(end.year, end.month, 1),
     compare=lambda a, b, base, to, ref=None: R.compare(a, b, base, to, ref), view=_view, ref_start=True, render=_render, orig=_orig)
